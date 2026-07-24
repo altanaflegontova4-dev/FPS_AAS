@@ -5,10 +5,9 @@ using UnityEngine.AI;
 
 public class EnemyController : MonoBehaviour
 {
-    //public float moveSpeed;
-    //public Rigidbody rb;
     private bool chasing;
-    public float distanceToChase = 10f, distanceToLose = 15f, distanceToStop = 2f;
+
+    public float distanceToChase = 10f, distanceToLose = 15f, distanceToStop = 2f, distanceToShoot = 7f;
     private Vector3 targetPoint, originalPoint;
 
     public NavMeshAgent agent;
@@ -18,7 +17,7 @@ public class EnemyController : MonoBehaviour
 
     [Header("Enemy Bullet Pool")]
     public BulletController bulletPrefab;
-    public int bulletPoolSize = 20;
+    public int bulletPoolSize = 30; // Увеличили пул, так как пуль теперь летит больше
 
     private Queue<BulletController> bulletPool = new Queue<BulletController>();
     private Transform bulletPoolParent;
@@ -26,46 +25,89 @@ public class EnemyController : MonoBehaviour
 
     public Transform firePoint;
 
-    public float fireRate, waitBetweenShots = 2f, timeToShoot = 1f;
+    public float fireRate = 1.35f, waitBetweenShots = 1f, timeToShoot = 1f;
     private float fireCount, shotWaitCounter, ShootTimeCounter;
+
+    [Header("Burst Settings")]
+    public int bulletsPerBurst = 3;      // Количество пуль в одной очереди
+    public float burstInterval = 0.15f;  // Скорострельность внутри очереди
+
+    [Header("Animation Sync")]
+    public float bulletSpawnDelay = 0.3f;
+
+    [Header("Aim Correction")]
+    public float aimOffsetAngle = 0f;
 
     public Animator anim;
 
-    // Start is called once before the first execution of Update after the MonoBehaviour is created
+    private bool hasStoppedForAttack = false;
+    private float stunTimer = 0f;
+
     void Start()
     {
         originalPoint = transform.position;
 
         ShootTimeCounter = timeToShoot;
-        shotWaitCounter = waitBetweenShots;
+        shotWaitCounter = 0f;
+        fireCount = 0f;
+        hasStoppedForAttack = false;
 
         PrepareBulletPool();
     }
 
-    // Update is called once per frame
+    public void StunByHit(float duration)
+    {
+        StopAllCoroutines(); // Отменяем текущие очереди и выстрелы при получении урона
+        stunTimer = duration;
+        chasing = false;
+    }
+
+    public void CancelAttacks()
+    {
+        StopAllCoroutines();
+    }
+
     void Update()
     {
-        targetPoint = PlayerController.instance.transform.position;
-        targetPoint.y = transform.position.y;//replacing his y target to be his y axis itself
-
-        if (!chasing)//chasing is false
+        // Если робот оглушен — пропускаем логику
+        if (stunTimer > 0f)
         {
+            stunTimer -= Time.deltaTime;
+            if (stunTimer <= 0f)
+            {
+                if (agent != null && !agent.enabled && gameObject.activeInHierarchy)
+                {
+                    agent.enabled = true;
+                }
+            }
+            return;
+        }
+
+        targetPoint = PlayerController.instance.transform.position;
+        targetPoint.y = transform.position.y;
+
+        if (!chasing)
+        {
+            agent.updateRotation = true;
+            hasStoppedForAttack = false;
+
             if (chaseCounter > 0)
             {
-                agent.destination = transform.position;//stop at his current position
-                chaseCounter -= Time.deltaTime;//counting down
+                agent.destination = transform.position;
+                chaseCounter -= Time.deltaTime;
             }
-            else//when chase counter equals to 0
+            else
             {
-                agent.destination = originalPoint;//go back to starting position
+                agent.destination = originalPoint;
             }
 
-            if (Vector3.Distance(transform.position, targetPoint) <= distanceToChase)//within chasing distance
+            if (Vector3.Distance(transform.position, targetPoint) <= distanceToChase)
             {
                 chasing = true;
-
                 ShootTimeCounter = timeToShoot;
-                shotWaitCounter = waitBetweenShots;
+                shotWaitCounter = 0f;
+                fireCount = 0f;
+                hasStoppedForAttack = false;
             }
 
             if (agent.remainingDistance < .25f)
@@ -77,76 +119,112 @@ public class EnemyController : MonoBehaviour
                 anim.SetBool("IsMoving", true);
             }
         }
-        else//chasing is true, he is chasing us here
+        else
         {
-            if (Vector3.Distance(transform.position, targetPoint) <= distanceToStop)//distance within 2m
-            {
-                agent.destination = transform.position;//stop at his current position
-            }
-            else//more than 2m
-            {
-                agent.destination = targetPoint;//chase the player
-            }
+            float distToPlayer = Vector3.Distance(transform.position, targetPoint);
 
-            if (Vector3.Distance(transform.position, targetPoint) > distanceToLose)//out of chasing distance
+            if (distToPlayer > distanceToLose)
             {
                 chasing = false;
-
                 chaseCounter = keepChasingTime;
+                hasStoppedForAttack = false;
             }
 
+            float triggerDistance = hasStoppedForAttack ? (distanceToShoot + 2f) : distanceToShoot;
 
-            if (shotWaitCounter > 0)
+            if (distToPlayer <= triggerDistance)
             {
-                shotWaitCounter -= Time.deltaTime;
+                agent.destination = transform.position;
+                agent.updateRotation = false;
 
-                if (shotWaitCounter <= 0)
+                if (!hasStoppedForAttack)
                 {
+                    shotWaitCounter = 0f;
+                    fireCount = 0f;
                     ShootTimeCounter = timeToShoot;
+                    hasStoppedForAttack = true;
                 }
 
-                anim.SetBool("IsMoving", true);
-            }
-            else if (PlayerController.instance.gameObject.activeInHierarchy)//just proceed the shooting when the player is active only
-            {
-                ShootTimeCounter -= Time.deltaTime;
-
-                if (ShootTimeCounter > 0)//shoot within shootTimeCounter period
+                // Плавный поворот с поправкой Mixamo
+                Vector3 direction = (targetPoint - transform.position).normalized;
+                if (direction != Vector3.zero)
                 {
-                    fireCount -= Time.deltaTime;
+                    Quaternion baseRotation = Quaternion.LookRotation(new Vector3(direction.x, 0, direction.z));
+                    Quaternion correctedRotation = baseRotation * Quaternion.Euler(0, aimOffsetAngle, 0);
+                    transform.rotation = Quaternion.Slerp(transform.rotation, correctedRotation, Time.deltaTime * 12f);
+                }
 
-                    if (fireCount <= 0)
+                if (shotWaitCounter > 0)
+                {
+                    shotWaitCounter -= Time.deltaTime;
+                    if (shotWaitCounter <= 0)
                     {
-                        fireCount = fireRate;
-                        transform.LookAt(targetPoint);
-                        firePoint.LookAt(PlayerController.instance.transform.position + new Vector3(0f, 0.4f, 0f));
-                        Vector3 targetDir = PlayerController.instance.transform.position - transform.position;//get direction
-                        float angle = Vector3.SignedAngle(targetDir, transform.forward, Vector3.up);//measuring the angle towards player
+                        ShootTimeCounter = timeToShoot;
+                    }
+                    anim.SetBool("IsMoving", false);
+                }
+                else if (PlayerController.instance.gameObject.activeInHierarchy)
+                {
+                    ShootTimeCounter -= Time.deltaTime;
 
-                        if (Math.Abs(angle) <= 30)//only shoot when angle is less than 30
-                        {
-                            // Instantiate(bullet, firePoint.position, firePoint.rotation);
-                            GetBullet(firePoint.position, firePoint.rotation);
+                    if (ShootTimeCounter > 0)
+                    {
+                        fireCount -= Time.deltaTime;
 
-                            anim.SetTrigger("fireShot");
-                        }
-                        else
+                        if (fireCount <= 0)
                         {
-                            shotWaitCounter = waitBetweenShots;
+                            fireCount = fireRate;
+
+                            Vector3 targetDir = PlayerController.instance.transform.position - transform.position;
+                            float angle = Vector3.SignedAngle(targetDir, transform.forward, Vector3.up);
+
+                            if (Math.Abs(angle) <= 45)
+                            {
+                                anim.SetTrigger("fireShot");
+
+                                // Запускаем корутину очереди пуль
+                                StartCoroutine(ShootBurst(bulletSpawnDelay));
+                            }
                         }
                     }
+                    else
+                    {
+                        shotWaitCounter = waitBetweenShots;
+                    }
 
-                    agent.destination = transform.position;//stop while shooting
+                    anim.SetBool("IsMoving", false);
                 }
-                else
-                {
-                    shotWaitCounter = waitBetweenShots;
-                }
-
-                anim.SetBool("IsMoving", false);
             }
+            else
+            {
+                agent.updateRotation = true;
+                agent.destination = targetPoint;
+                shotWaitCounter = 0f;
+                fireCount = 0f;
+                hasStoppedForAttack = false;
+                anim.SetBool("IsMoving", true);
+            }
+        }
+    }
 
+    private System.Collections.IEnumerator ShootBurst(float initialDelay)
+    {
+        yield return new WaitForSeconds(initialDelay);
 
+        for (int i = 0; i < bulletsPerBurst; i++)
+        {
+            if (PlayerController.instance == null || !gameObject.activeInHierarchy) yield break;
+
+            Vector3 playerCenter = PlayerController.instance.transform.position + new Vector3(0f, 0.4f, 0f);
+            Vector3 directionToPlayer = (playerCenter - firePoint.position).normalized;
+            Quaternion accurateRotation = Quaternion.LookRotation(directionToPlayer);
+
+            GetBullet(firePoint.position, accurateRotation);
+
+            if (i < bulletsPerBurst - 1)
+            {
+                yield return new WaitForSeconds(burstInterval);
+            }
         }
     }
 
@@ -166,8 +244,6 @@ public class EnemyController : MonoBehaviour
         }
 
         bulletPoolReady = true;
-
-        Debug.Log(gameObject.name + " enemy bullet pool created.");
     }
 
     private BulletController GetBullet(Vector3 position, Quaternion rotation)

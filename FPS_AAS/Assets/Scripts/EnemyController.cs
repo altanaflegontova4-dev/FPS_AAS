@@ -70,11 +70,11 @@ public class EnemyController : MonoBehaviour
 
             if (agent.remainingDistance < .25f)
             {
-                anim.SetBool("isMoving", false);
+                anim.SetBool("IsMoving", false);
             }
             else
             {
-                anim.SetBool("isMoving", true);
+                anim.SetBool("IsMoving", true);
             }
         }
         else//chasing is true, he is chasing us here
@@ -105,7 +105,7 @@ public class EnemyController : MonoBehaviour
                     ShootTimeCounter = timeToShoot;
                 }
 
-                anim.SetBool("isMoving", true);
+                anim.SetBool("IsMoving", true);
             }
             else if (PlayerController.instance.gameObject.activeInHierarchy)//just proceed the shooting when the player is active only
             {
@@ -143,7 +143,7 @@ public class EnemyController : MonoBehaviour
                     shotWaitCounter = waitBetweenShots;
                 }
 
-                anim.SetBool("isMoving", false);
+                anim.SetBool("IsMoving", false);
             }
 
 

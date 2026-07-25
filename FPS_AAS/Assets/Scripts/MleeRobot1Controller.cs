@@ -19,6 +19,10 @@ public class MleeRobot1Controller : MonoBehaviour
 
     public Animator anim;
 
+    [Header("Line of Sight")]
+    public LayerMask obstacleMask; // Слой стен и препятствий, которые блокируют обзор
+    public float eyeHeight = 1f;   // Высота глаз робота
+
     [Header("Attack Settings")]
     public float attackCooldown = 2f;
     private float attackTimer;
@@ -39,6 +43,12 @@ public class MleeRobot1Controller : MonoBehaviour
         if (attackTimer > 0)
         {
             attackTimer -= Time.deltaTime;
+        }
+
+        if (!HasLineOfSight())
+        {
+            anim.SetBool("IsMoving", false);
+            return; // Пропускаем весь остальной код атаки/погони в этом кадре
         }
 
         if (isAttacking)
@@ -134,6 +144,25 @@ public class MleeRobot1Controller : MonoBehaviour
         anim.SetBool("IsMoving", isMoving);
     }
 
+    bool HasLineOfSight()
+    {
+        if (PlayerController.instance == null) return false;
+
+        Vector3 startPos = transform.position + Vector3.up * eyeHeight;
+        // Берем позицию прямо из синглтона игрока
+        Vector3 endPos = PlayerController.instance.transform.position + Vector3.up * 0.5f;
+
+        RaycastHit hit;
+        if (Physics.Linecast(startPos, endPos, out hit, obstacleMask))
+        {
+            // Если луч уперся во что-то, что НЕ игрок — значит, на пути стена
+            if (!hit.transform.CompareTag("Player"))
+            {
+                return false;
+            }
+        }
+        return true; // Стены нет, игрок виден
+    }
     void Attack()
     {
         transform.LookAt(new Vector3(targetPoint.x, targetPoint.y, targetPoint.z));

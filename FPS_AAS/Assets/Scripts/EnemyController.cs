@@ -15,6 +15,11 @@ public class EnemyController : MonoBehaviour
     public float keepChasingTime = 5f;
     private float chaseCounter;
 
+    [Header("Line of Sight")]
+    public LayerMask obstacleMask; // Слой стен и препятствий, которые блокируют обзор
+    public float eyeHeight = 1f;   // Высота глаз робота
+
+
     [Header("Enemy Bullet Pool")]
     public BulletController bulletPrefab;
     public int bulletPoolSize = 30; // Увеличили пул, так как пуль теперь летит больше
@@ -67,6 +72,32 @@ public class EnemyController : MonoBehaviour
         StopAllCoroutines();
     }
 
+    bool HasLineOfSight()
+    {
+        if (PlayerController.instance == null) return false;
+
+        Vector3 startPos = transform.position + Vector3.up * 1f;
+        Vector3 endPos = PlayerController.instance.transform.position + Vector3.up * 0.5f;
+
+        RaycastHit hit;
+        // Рисуем линию в окне Scene: если путь чистый — зеленая, если уперлась в стену — красная!
+        if (Physics.Linecast(startPos, endPos, out hit, obstacleMask))
+        {
+            Debug.DrawLine(startPos, hit.point, Color.red); // Уперлись в преграду
+
+            if (!hit.transform.CompareTag("Player"))
+            {
+                return false; // Это стена, видимости нет
+            }
+        }
+        else
+        {
+            Debug.DrawLine(startPos, endPos, Color.green); // Путь полностью чист
+        }
+
+        return true;
+    }
+
     void Update()
     {
         // Если робот оглушен — пропускаем логику
@@ -85,6 +116,12 @@ public class EnemyController : MonoBehaviour
 
         targetPoint = PlayerController.instance.transform.position;
         targetPoint.y = transform.position.y;
+
+        if (!HasLineOfSight())
+        {
+            anim.SetBool("IsMoving", false);
+            return; // Пропускаем весь остальной код атаки/погони в этом кадре
+        }
 
         if (!chasing)
         {

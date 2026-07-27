@@ -16,13 +16,12 @@ public class EnemyController : MonoBehaviour
     private float chaseCounter;
 
     [Header("Line of Sight")]
-    public LayerMask obstacleMask; // Слой стен и препятствий, которые блокируют обзор
-    public float eyeHeight = 1f;   // Высота глаз робота
-
+    public LayerMask obstacleMask; // Слой стен/препятствий (НЕ включать игрока и врага!)
+    public float eyeHeight = 1f;   // Высота точки пуска луча от врага
 
     [Header("Enemy Bullet Pool")]
     public BulletController bulletPrefab;
-    public int bulletPoolSize = 30; // Увеличили пул, так как пуль теперь летит больше
+    public int bulletPoolSize = 30;
 
     private Queue<BulletController> bulletPool = new Queue<BulletController>();
     private Transform bulletPoolParent;
@@ -34,8 +33,8 @@ public class EnemyController : MonoBehaviour
     private float fireCount, shotWaitCounter, ShootTimeCounter;
 
     [Header("Burst Settings")]
-    public int bulletsPerBurst = 3;      // Количество пуль в одной очереди
-    public float burstInterval = 0.15f;  // Скорострельность внутри очереди
+    public int bulletsPerBurst = 3;
+    public float burstInterval = 0.15f;
 
     [Header("Animation Sync")]
     public float bulletSpawnDelay = 0.3f;
@@ -62,9 +61,10 @@ public class EnemyController : MonoBehaviour
 
     public void StunByHit(float duration)
     {
-        StopAllCoroutines(); // Отменяем текущие очереди и выстрелы при получении урона
+        StopAllCoroutines();
         stunTimer = duration;
         chasing = false;
+        agent.destination = transform.position; // останавливаем движение
     }
 
     public void CancelAttacks()
@@ -72,57 +72,77 @@ public class EnemyController : MonoBehaviour
         StopAllCoroutines();
     }
 
+    // Проверка линии видимости: два луча (центр и голова игрока)
     bool HasLineOfSight()
     {
         if (PlayerController.instance == null) return false;
 
-        Vector3 startPos = transform.position + Vector3.up * 1f;
-        Vector3 endPos = PlayerController.instance.transform.position + Vector3.up * 0.5f;
+        Vector3 startPos = transform.position + Vector3.up * eyeHeight;
+        Vector3 playerCenter = PlayerController.instance.transform.position + new Vector3(0f, 0.8f, 0f); // примерно центр тела
+        Vector3 playerEye = PlayerController.instance.transform.position + new Vector3(0f, 1.6f, 0f);    // уровень глаз
 
+        if (!CheckRay(startPos, playerCenter)) return false;
+        if (!CheckRay(startPos, playerEye)) return false;
+
+        return true;
+    }
+
+    bool CheckRay(Vector3 start, Vector3 end)
+    {
         RaycastHit hit;
-        // Рисуем линию в окне Scene: если путь чистый — зеленая, если уперлась в стену — красная!
-        if (Physics.Linecast(startPos, endPos, out hit, obstacleMask))
+        // Linecast проверяет только коллизии на слоях из obstacleMask
+        if (Physics.Linecast(start, end, out hit, obstacleMask))
         {
-            Debug.DrawLine(startPos, hit.point, Color.red); // Уперлись в преграду
-
-            if (!hit.transform.CompareTag("Player"))
-            {
-                return false; // Это стена, видимости нет
-            }
-        }
-        else
-        {
-            Debug.DrawLine(startPos, endPos, Color.green); // Путь полностью чист
+            // Уперлись в препятствие (стена/перекрытие)
+            Debug.DrawLine(start, hit.point, Color.red);
+            return false;
         }
 
+        Debug.DrawLine(start, end, Color.green);
         return true;
     }
 
     void Update()
     {
-        // Если робот оглушен — пропускаем логику
+        // Если оглушён — пропускаем логику
         if (stunTimer > 0f)
         {
             stunTimer -= Time.deltaTime;
-            if (stunTimer <= 0f)
+            if (stunTimer <= 0f && agent != null && !agent.enabled && gameObject.activeInHierarchy)
             {
-                if (agent != null && !agent.enabled && gameObject.activeInHierarchy)
-                {
-                    agent.enabled = true;
-                }
+                agent.enabled = true;
             }
             return;
         }
 
+        // Получаем позицию игрока (плоская для навигации)
         targetPoint = PlayerController.instance.transform.position;
         targetPoint.y = transform.position.y;
 
-        if (!HasLineOfSight())
+        // Проверка по вертикали: если слишком большая разница по Y, считаем, что не видим (полезно для этажей)
+        float verticalDiff = Mathf.Abs(transform.position.y - PlayerController.instance.transform.position.y);
+        const float maxVerticalDiffForSight = 4.0f; // подбери под высоту этажа
+
+        bool canSee = HasLineOfSight();
+        bool isVerticallyClose = verticalDiff <= maxVerticalDiffForSight;
+
+        // Если нет видимости ИЛИ большая вертикальная разница — останавливаем врага
+        if (!canSee || !isVerticallyClose)
         {
+            agent.destination = transform.position; // принудительно стопорим агента
             anim.SetBool("IsMoving", false);
-            return; // Пропускаем весь остальной код атаки/погони в этом кадре
+
+            // Если не преследуем — сбрасываем флаги атаки
+            if (chasing)
+            {
+                chasing = false;
+                hasStoppedForAttack = false;
+            }
+
+            return;
         }
 
+        // Логика начала/продолжения погони
         if (!chasing)
         {
             agent.updateRotation = true;
@@ -138,7 +158,8 @@ public class EnemyController : MonoBehaviour
                 agent.destination = originalPoint;
             }
 
-            if (Vector3.Distance(transform.position, targetPoint) <= distanceToChase)
+            float distToPlayer = Vector3.Distance(transform.position, targetPoint);
+            if (distToPlayer <= distanceToChase)
             {
                 chasing = true;
                 ShootTimeCounter = timeToShoot;
@@ -165,11 +186,15 @@ public class EnemyController : MonoBehaviour
                 chasing = false;
                 chaseCounter = keepChasingTime;
                 hasStoppedForAttack = false;
+                agent.destination = transform.position;
+                anim.SetBool("IsMoving", false);
+                return;
             }
 
             float triggerDistance = hasStoppedForAttack ? (distanceToShoot + 2f) : distanceToShoot;
 
-            if (distToPlayer <= triggerDistance)
+            // Атака: только если видим игрока
+            if (distToPlayer <= triggerDistance && canSee)
             {
                 agent.destination = transform.position;
                 agent.updateRotation = false;
@@ -182,7 +207,7 @@ public class EnemyController : MonoBehaviour
                     hasStoppedForAttack = true;
                 }
 
-                // Плавный поворот с поправкой Mixamo
+                // Поворот к игроку
                 Vector3 direction = (targetPoint - transform.position).normalized;
                 if (direction != Vector3.zero)
                 {
@@ -218,8 +243,6 @@ public class EnemyController : MonoBehaviour
                             if (Math.Abs(angle) <= 45)
                             {
                                 anim.SetTrigger("fireShot");
-
-                                // Запускаем корутину очереди пуль
                                 StartCoroutine(ShootBurst(bulletSpawnDelay));
                             }
                         }
@@ -234,6 +257,7 @@ public class EnemyController : MonoBehaviour
             }
             else
             {
+                // Погоня: идём к игроку, если не атакуем
                 agent.updateRotation = true;
                 agent.destination = targetPoint;
                 shotWaitCounter = 0f;
@@ -270,6 +294,7 @@ public class EnemyController : MonoBehaviour
         if (bulletPoolReady) return;
 
         GameObject parentObj = new GameObject(gameObject.name + "_EnemyBulletPool");
+        parentObj.transform.SetParent(transform); // удобно держать внутри врага
         bulletPoolParent = parentObj.transform;
 
         for (int i = 0; i < bulletPoolSize; i++)

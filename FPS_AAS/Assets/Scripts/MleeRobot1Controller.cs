@@ -31,7 +31,7 @@ public class MleeRobot1Controller : MonoBehaviour
     public float attackDuration = 1.2f;
     private float attackDurationTimer;
 
-    public int attackDamage = 1;
+    public int attackDamage = 5;
 
     void Start()
     {

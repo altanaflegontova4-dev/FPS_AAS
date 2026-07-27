@@ -155,12 +155,9 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::BulletController
   moveSpeed: 15
-  lifeTime: 5
+  lifeTime: 3
   rb: {fileID: 4745003187337327281}
-  impact: {fileID: 7694399406574224516, guid: da8ad151ec21eae499174e18efa367a5, type: 3}
-  damageEnemy: 1
-  damagePlayer: 0
-  damageAmount: 2
+  impactEffect: {fileID: 0}
   attackPlayer: 0
   damage: 10
 --- !u!96 &-4723514154256684294

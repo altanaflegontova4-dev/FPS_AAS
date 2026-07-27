@@ -3,18 +3,21 @@ using UnityEngine;
 
 public class BulletController : MonoBehaviour
 {
-    public float moveSpeed, lifeTime;
+    public float moveSpeed;
+    public float lifeTime;
     public Rigidbody rb;
     public GameObject impactEffect;
-    // public bool damageEnemy, damagePlayer;
-    // public int damageAmount;
 
     public bool attackPlayer;
     public int damage;
 
     private float lifeCounter;
-    private Gun ownerGun;
     private bool hasHit;
+
+    // --- НОВОЕ: Таймер игнорирования столкновений при рождении ---
+    private float ignoreCollisionTimer;
+    private const float IGNORE_DURATION = 0.05f; // Игнорируем столкновения первые 0.05 сек
+    // -------------------------------------------------------------
 
     private Action<BulletController> returnToPool;
 
@@ -28,18 +31,14 @@ public class BulletController : MonoBehaviour
         hasHit = false;
         lifeCounter = lifeTime;
 
+        // Сбрасываем таймер игнорирования при каждом выстреле
+        ignoreCollisionTimer = IGNORE_DURATION;
+
         rb.linearVelocity = Vector3.zero;
         rb.angularVelocity = Vector3.zero;
-
         rb.linearVelocity = transform.forward * moveSpeed;
     }
 
-    // Start is called once before the first execution of Update after the MonoBehaviour is created
-    void Start()
-    {
-    }
-
-    // Update is called once per frame
     private void Update()
     {
         lifeCounter -= Time.deltaTime;
@@ -48,12 +47,24 @@ public class BulletController : MonoBehaviour
         {
             ReturnToPool();
         }
+
+        // Уменьшаем таймер игнорирования каждый кадр
+        if (ignoreCollisionTimer > 0)
+        {
+            ignoreCollisionTimer -= Time.deltaTime;
+        }
     }
 
     private void OnTriggerEnter(Collider other)
     {
+        // 1. Если мы уже попали - выходим
         if (hasHit) return;
 
+        // 2. ГЛАВНОЕ: Если таймер игнорирования еще не истек - выходим!
+        // Пуля только родилась внутри босса, мы не даем ей умереть сразу.
+        if (ignoreCollisionTimer > 0) return;
+
+        // Теперь, когда пуля вылетела из босса, проверяем остальное
         hasHit = true;
 
         IDamagable damageable = other.GetComponentInParent<IDamagable>();
@@ -67,7 +78,6 @@ public class BulletController : MonoBehaviour
         {
             float offset = 0.7f;
             Vector3 newPosition = transform.position - transform.forward * offset;
-
             Instantiate(impactEffect, newPosition, transform.rotation);
         }
 
@@ -81,11 +91,11 @@ public class BulletController : MonoBehaviour
 
         if (returnToPool != null)
         {
-            returnToPool(this);//Send this bullet back to the pool that created it.
+            returnToPool(this);
         }
         else
         {
-            gameObject.SetActive(false);//a safety fallback, just in case it is not connected to the pool, just disable it
+            gameObject.SetActive(false);
         }
     }
 }

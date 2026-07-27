@@ -11,16 +11,26 @@ public class BossController : MonoBehaviour
     public Animator anim;
     private Transform player;
 
+    [Header("Damage Setting Combat")]
+    public int chargeDamage = 10;
+    public int slamDamage = 12;
+
     [Header("Combat Settings")]
     public float maxHealth = 100f;
     private float currentHealth;
     private bool isDead = false;
-    private bool isRaged = false; // Фаза 2 (Ярость при <50% HP)
+    private bool isRaged = false; // Фаза 2 (<50% HP)
 
-    [Header("Distances")]
-    public float distanceToShoot = 12f;
-    public float distanceToLeap = 8f;
-    public float distanceToCharge = 15f;
+    [Header("Tactical Spacing")]
+    public float personalSpace = 5f;    // Если игрок подошел вплотную — босс отталкивает или бьет
+    public float optimalRange = 12f;    // Оптимальная дистанция для ведения боя
+    public float maxChaseRange = 18f;   // Если игрок дальше — босс делает таран или бежит сокращать дистанцию
+    public float attackCooldown = 1.2f; // Пауза между атаками для создания напряжения!
+    private float cooldownTimer = 0f;
+
+    [Header("Line of Sight (Walls Check)")]
+    public LayerMask obstacleMask;
+    public float eyeHeight = 1.5f;
 
     [Header("Boss Bullet Pool")]
     public BulletController bulletPrefab;
@@ -29,45 +39,38 @@ public class BossController : MonoBehaviour
     private Transform bulletPoolParent;
     private bool bulletPoolReady;
 
-    [Header("Weapon / Fire Points & Rhythm")]
-    public Transform[] firePoints; // Точки стрельбы на плечах/руках босса
+    [Header("Weapon / Fire Points")]
+    public Transform[] firePoints;
     public int bulletsPerBurst = 5;
     public float burstInterval = 0.12f;
     public float bulletSpawnDelay = 0.4f;
     public float aimOffsetAngle = 0f;
 
-    // Параметры темпа стрельбы и пауз (как у Robot 2)
+    private float fireCount, shotWaitCounter, ShootTimeCounter;
     public float fireRate = 1.35f;
     public float waitBetweenShots = 1f;
     public float timeToShoot = 2f;
-    private float fireCount, shotWaitCounter, ShootTimeCounter;
     private bool hasStoppedForAttack = false;
 
     private bool isAttacking = false;
     private float stunTimer = 0f;
 
-    // Скорости движения
     private float normalSpeed;
     private float rageSpeed;
 
     void Start()
     {
         currentHealth = maxHealth;
-
         ShootTimeCounter = timeToShoot;
-        shotWaitCounter = 0f;
-        fireCount = 0f;
-        hasStoppedForAttack = false;
 
         if (PlayerController.instance != null)
-        {
             player = PlayerController.instance.transform;
-        }
 
         if (agent != null)
         {
             normalSpeed = agent.speed;
-            rageSpeed = normalSpeed * 1.4f;
+            rageSpeed = normalSpeed * 1.35f;
+            agent.stoppingDistance = 6f; // ВАЖНО: Босс больше не липнет к лицу игрока!
         }
 
         PrepareBulletPool();
@@ -77,135 +80,174 @@ public class BossController : MonoBehaviour
     {
         if (isDead || player == null) return;
 
-        // Если босс оглушен от попадания
+        // Обработка оглушения / получения урона
         if (stunTimer > 0f)
         {
             stunTimer -= Time.deltaTime;
             if (stunTimer <= 0f && agent != null && gameObject.activeInHierarchy)
             {
                 agent.enabled = true;
+                agent.isStopped = false;
             }
             return;
         }
 
-        // Проверяем фазу Ярости (< 50% здоровья)
+        // Переход в фазу ярости
         if (!isRaged && currentHealth <= maxHealth * 0.5f)
         {
             EnterRageMode();
         }
 
-        // Если босс сейчас выполняет уникальную атаку (прыжок или таран), не прерываем её
         if (isAttacking) return;
 
-        float distToPlayer = Vector3.Distance(transform.position, player.position);
-        float triggerDistance = hasStoppedForAttack ? (distanceToShoot + 2f) : distanceToShoot;
-
-        // Логика удержания дистанции и ритма атак
-        if (distToPlayer <= triggerDistance)
+        // Таймер передышки (чтобы босс не спамил атаки как пулемет, а давал игроку напряженный момент)
+        if (cooldownTimer > 0f)
         {
-            agent.destination = transform.position;
-            agent.updateRotation = false;
+            cooldownTimer -= Time.deltaTime;
+            StopAgentAndFacePlayer();
+            anim.SetBool("IsMoving", false);
+            return;
+        }
 
-            if (!hasStoppedForAttack)
-            {
-                shotWaitCounter = 0f;
-                fireCount = 0f;
-                ShootTimeCounter = timeToShoot;
-                hasStoppedForAttack = true;
-            }
+        float distToPlayer = Vector3.Distance(transform.position, player.position);
 
-            // Плавный поворот лицом к игроку с поправкой Mixamo
-            Vector3 direction = (player.position - transform.position).normalized;
-            direction.y = 0;
-            if (direction != Vector3.zero)
-            {
-                Quaternion baseRotation = Quaternion.LookRotation(direction);
-                Quaternion correctedRotation = baseRotation * Quaternion.Euler(0, aimOffsetAngle, 0);
-                transform.rotation = Quaternion.Slerp(transform.rotation, correctedRotation, Time.deltaTime * 10f);
-            }
+        // Проверка видимости через стены
+        if (!HasLineOfSight())
+        {
+            ChasePlayer(2f); // Если игрок за стеной, подбегаем ближе
+            return;
+        }
 
-            // Логика таймеров стрельбы и пауз (как у Robot 2)
-            if (shotWaitCounter > 0)
-            {
-                shotWaitCounter -= Time.deltaTime;
-                if (shotWaitCounter <= 0)
-                {
-                    ShootTimeCounter = timeToShoot;
-                }
-                anim.SetBool("IsMoving", false);
-            }
-            else
-            {
-                ShootTimeCounter -= Time.deltaTime;
+        // --- ТАКТИЧЕСКИЙ ИИ (СОЗДАНИЕ НАПРЯЖЕНИЯ) ---
 
-                if (ShootTimeCounter > 0)
-                {
-                    fireCount -= Time.deltaTime;
-
-                    if (fireCount <= 0)
-                    {
-                        fireCount = isRaged ? fireRate * 0.6f : fireRate;
-                        ExecuteBossAttack(distToPlayer);
-                    }
-                }
-                else
-                {
-                    shotWaitCounter = isRaged ? waitBetweenShots * 0.5f : waitBetweenShots;
-                }
-
-                anim.SetBool("IsMoving", false);
-            }
+        if (distToPlayer <= personalSpace)
+        {
+            // 1. ИГРОК СЛИШКОМ БЛИЗКО: Босс наказывает за наглость мощным ударом вблизи!
+            StopAgentAndFacePlayer();
+            StartCoroutine(LeapSlamAttack());
+        }
+        else if (distToPlayer <= optimalRange)
+        {
+            // 2. ОПТИМАЛЬНАЯ ЗОНА: Босс держит дистанцию (не лезет в лицо!) и ведет прицельный огонь
+            StopAgentAndFacePlayer();
+            HandleShootingRhythm(distToPlayer);
+        }
+        else if (distToPlayer <= maxChaseRange)
+        {
+            // 3. ИГРОК ОТХОДИТ: Босс просто идет за ним, сохраняя дистанцию остановки (6 метров)
+            ChasePlayer(6f);
         }
         else
         {
-            agent.updateRotation = true;
+            // 4. ИГРОК УБЕЖАЛ ДАЛЕКО: Идеальный момент для смертоносного тарана!
+            if (isRaged || UnityEngine.Random.value < 0.75f)
+            {
+                StartCoroutine(ChargeAttack());
+            }
+            else
+            {
+                ChasePlayer(5f);
+            }
+        }
+    }
+
+    void ChasePlayer(float stopDist)
+    {
+        hasStoppedForAttack = false;
+        if (agent != null && agent.enabled)
+        {
+            agent.isStopped = false;
+            agent.stoppingDistance = stopDist;
             agent.destination = player.position;
+            anim.SetBool("IsMoving", agent.velocity.sqrMagnitude > 0.1f);
+        }
+    }
+
+    void StopAgentAndFacePlayer()
+    {
+        if (agent != null && agent.enabled)
+        {
+            agent.isStopped = true;
+            agent.velocity = Vector3.zero;
+        }
+
+        Vector3 direction = (player.position - transform.position).normalized;
+        direction.y = 0;
+        if (direction != Vector3.zero)
+        {
+            Quaternion baseRotation = Quaternion.LookRotation(direction);
+            Quaternion correctedRotation = baseRotation * Quaternion.Euler(0, aimOffsetAngle, 0);
+            transform.rotation = Quaternion.Slerp(transform.rotation, correctedRotation, Time.deltaTime * 10f);
+        }
+    }
+
+    void HandleShootingRhythm(float dist)
+    {
+        if (!hasStoppedForAttack)
+        {
             shotWaitCounter = 0f;
             fireCount = 0f;
-            hasStoppedForAttack = false;
-            anim.SetBool("IsMoving", true);
+            ShootTimeCounter = timeToShoot;
+            hasStoppedForAttack = true;
         }
+
+        if (shotWaitCounter > 0)
+        {
+            shotWaitCounter -= Time.deltaTime;
+            anim.SetBool("IsMoving", false);
+        }
+        else
+        {
+            ShootTimeCounter -= Time.deltaTime;
+            if (ShootTimeCounter > 0)
+            {
+                fireCount -= Time.deltaTime;
+                if (fireCount <= 0)
+                {
+                    StartCoroutine(ShootBurst(bulletSpawnDelay));
+                    fireCount = isRaged ? fireRate * 0.5f : fireRate;
+                }
+            }
+            else
+            {
+                shotWaitCounter = isRaged ? waitBetweenShots * 0.6f : waitBetweenShots;
+            }
+            anim.SetBool("IsMoving", false);
+        }
+    }
+
+    bool HasLineOfSight()
+    {
+        if (player == null) return false;
+        Vector3 startPos = transform.position + Vector3.up * eyeHeight;
+        Vector3 endPos = player.position + Vector3.up * 0.5f;
+
+        RaycastHit hit;
+        if (Physics.Linecast(startPos, endPos, out hit, obstacleMask))
+        {
+            Debug.DrawLine(startPos, hit.point, Color.red);
+            if (!hit.transform.CompareTag("Player")) return false;
+        }
+        else
+        {
+            Debug.DrawLine(startPos, endPos, Color.green);
+        }
+        return true;
     }
 
     void EnterRageMode()
     {
         isRaged = true;
         if (agent != null) agent.speed = rageSpeed;
-        Debug.Log("БОСС ПЕРЕШЕЛ В ФАЗУ ЯРОСТИ!");
+        attackCooldown = 0.6f; // В ярости передышки короче!
+        Debug.Log("БОСС В ЯРОСТИ! Скорость и агрессия повышены.");
     }
 
-    void ExecuteBossAttack(float distance)
-    {
-        // Случайный выбор от 0 до 2
-        int attackChoice = UnityEngine.Random.Range(0, 3);
-
-        // В фазе ярости у босса выше шанс сделать рывок или прыжок
-        if (isRaged)
-        {
-            attackChoice = UnityEngine.Random.Range(0, 2); // 0 или 1 будут чаще провоцировать спец-атаки
-        }
-
-        // Смягчаем условия дистанции, чтобы атаки реально происходили
-        if (distance <= distanceToLeap && attackChoice == 0)
-        {
-            StartCoroutine(LeapSlamAttack());
-        }
-        else if (distance >= 8f && attackChoice == 1)
-        {
-            StartCoroutine(ChargeAttack());
-        }
-        else
-        {
-            StartCoroutine(ShootBurst(bulletSpawnDelay));
-        }
-    }
-
-    // --- АТАКА 1: Плечевой залп ---
+    // --- АТАКА 1: Стрельба очередьми ---
     IEnumerator ShootBurst(float initialDelay)
     {
         isAttacking = true;
         anim.SetTrigger("fireShot");
-
         yield return new WaitForSeconds(initialDelay);
 
         for (int i = 0; i < bulletsPerBurst; i++)
@@ -214,110 +256,170 @@ public class BossController : MonoBehaviour
 
             foreach (Transform fp in firePoints)
             {
-                if (fp != null)
-                {
-                    Vector3 playerCenter = player.position + new Vector3(0f, 0.4f, 0f);
-                    Vector3 directionToPlayer = (playerCenter - fp.position).normalized;
-                    Quaternion accurateRotation = Quaternion.LookRotation(directionToPlayer);
+                if (fp == null) continue;
+                Vector3 targetCenter = player.position + new Vector3(0f, 0.4f, 0f);
+                Vector3 dir = targetCenter - fp.position;
+                if (dir.sqrMagnitude < 0.01f) continue;
 
-                    GetBullet(fp.position, accurateRotation);
-                }
+                GetBullet(fp.position, Quaternion.LookRotation(dir));
             }
 
             if (i < bulletsPerBurst - 1)
-            {
                 yield return new WaitForSeconds(burstInterval);
-            }
         }
 
         yield return new WaitForSeconds(0.4f);
-        isAttacking = false;
+        FinishAttack(isRaged ? 0.5f : attackCooldown);
     }
 
-    // --- АТАКА 2: Прыжок-удар (Leap Slam) ---
+    // --- Attack 2: Leap Slam
     IEnumerator LeapSlamAttack()
     {
         isAttacking = true;
         anim.SetTrigger("LeapSlam");
-
         if (agent != null) agent.enabled = false;
 
-        yield return new WaitForSeconds(0.8f);
+        yield return new WaitForSeconds(1.5f);
 
-        float slamRadius = 4f;
+        float slamRadius = 4.5f;
         if (player != null && Vector3.Distance(transform.position, player.position) <= slamRadius)
         {
-            Debug.Log("Игрок задет ударной волной босса!");
+            IDamagable player = PlayerController.instance.GetComponentInChildren<IDamagable>();
+
+            if (player != null)
+            {
+                player.TakeDamage(slamDamage, true);
+                Debug.Log("Player is damaged");
+            }
         }
 
-        yield return new WaitForSeconds(0.5f);
-
-        if (agent != null && !isDead) agent.enabled = true;
-        isAttacking = false;
+        yield return new WaitForSeconds(0.6f);
+        if (agent != null && !isDead)
+        {
+            agent.enabled = true;
+            agent.isStopped = false;
+        }
+        FinishAttack(attackCooldown * 1.2f); // После тяжелого прыжка босс дольше приходит в себя
     }
 
-    // --- АТАКА 3: Таран (Charge) ---
-    // --- АТАКА 3: Таран (Charge) ---
+    // --- Attack 3: Charge
     IEnumerator ChargeAttack()
     {
         isAttacking = true;
-        anim.SetTrigger("Charge");
 
-        yield return new WaitForSeconds(0.6f); // Время на анимацию приседа
+        anim.SetBool("IsMoving", false);
+        anim.SetBool("IsCharging", true);
+        anim.SetTrigger("Charge");
 
         if (agent != null)
         {
-            agent.enabled = true;
-            // Устанавливаем четкую скорость для тарана (без бесконечного умножения)
-            float baseSpd = isRaged ? rageSpeed : normalSpeed;
-            agent.speed = baseSpd * 2.2f;
-
-            // Включаем анимацию бега, чтобы ноги перебирались, а не было скольжения!
-            anim.SetBool("IsMoving", true);
+            agent.isStopped = true;
+            agent.velocity = Vector3.zero;
+            agent.enabled = false;
         }
 
-        float chargeTime = 1.5f;
+        Vector3 frozenPosition = transform.position;
         float elapsed = 0f;
 
-        while (elapsed < chargeTime && !isDead)
+        while (elapsed < 0.6f)
         {
             elapsed += Time.deltaTime;
-
-            // Чтобы он подруливал за игроком во время рывка
-            if (player != null && agent != null && agent.enabled)
-            {
-                agent.destination = player.position;
-            }
-
-            // Проверка столкновения с игроком
-            if (player != null && Vector3.Distance(transform.position, player.position) < 2.2f)
-            {
-                Debug.Log("Босс протаранил игрока!");
-                // Здесь можно нанести урон игроку
-                break;
-            }
+            transform.position = frozenPosition;
             yield return null;
         }
 
-        // Возвращаем нормальную скорость и выключаем бег в аниматоре
-        if (agent != null)
+        if (agent != null && !isDead)
         {
-            agent.speed = isRaged ? rageSpeed : normalSpeed;
+            agent.enabled = true;
+            agent.isStopped = false;
+            agent.speed = rageSpeed * 5.0f;
+            agent.acceleration = 50f;
+            agent.stoppingDistance = 2.0f;
+            agent.updateRotation = true;
+
+            if (player != null)
+                agent.destination = player.position;
         }
 
+        float chargeDuration = 2.0f;
+        elapsed = 0f;
+        bool hitPlayer = false;
+
+        while (elapsed < chargeDuration && !isDead)
+        {
+            elapsed += Time.deltaTime;
+
+          
+                if (player != null && agent != null && agent.enabled)
+                {
+                    agent.destination = player.position;
+
+                    float dist = Vector3.Distance(transform.position, player.position);
+                    Debug.Log("Дистанция до игрока: " + dist); // добавь это
+
+                    if (dist <= 4.0f)
+                    {
+                    // урон...
+                    hitPlayer = true;
+                    Debug.Log("Дистанция подходящая — пытаемся нанести урон");
+
+                    IDamagable playerDamagable =
+                        PlayerController.instance.GetComponentInChildren<IDamagable>();
+
+                    if (playerDamagable != null)
+                    {
+                        Debug.Log("IDamagable найден — наносим урон " + chargeDamage);
+                        playerDamagable.TakeDamage(chargeDamage, true);
+                    }
+                }
+                }
+
+
+                yield return null;
+        }
+
+        anim.SetBool("IsCharging", false);
         anim.SetBool("IsMoving", false);
-        yield return new WaitForSeconds(0.5f);
-        isAttacking = false;
+
+        if (agent != null && !isDead)
+        {
+            agent.speed = isRaged ? rageSpeed : normalSpeed;
+            agent.acceleration = 12f;
+            agent.stoppingDistance = 6f;
+            agent.isStopped = true;
+            agent.velocity = Vector3.zero;
+        }
+
+        if (hitPlayer && !isDead)
+        {
+            anim.SetTrigger("LeapSlam");
+            yield return new WaitForSeconds(1.0f);
+        }
+
+        FinishAttack(attackCooldown * 1.5f);
     }
 
-    // --- Управление при уроне ---
+    // Вызывается в конце каждой атаки, чтобы задать паузу (ритм боя)
+    void FinishAttack(float cooldown)
+    {
+        isAttacking = false;
+        cooldownTimer = cooldown;
+        hasStoppedForAttack = false;
+    }
+
     public void StunByHit(float duration)
     {
         StopAllCoroutines();
         isAttacking = false;
         stunTimer = duration;
         hasStoppedForAttack = false;
-        if (agent != null) agent.enabled = false;
+
+        if (agent != null)
+        {
+            agent.enabled = false;
+        }
+
+        anim.SetTrigger("Hit");
     }
 
     public void CancelAttacks()
@@ -326,11 +428,32 @@ public class BossController : MonoBehaviour
         isAttacking = false;
     }
 
+    public void TakeDamage(float amount)
+    {
+        if (isDead) return;
+        currentHealth -= amount;
+
+        StunByHit(0.25f);
+
+        if (currentHealth <= 0)
+        {
+            Die();
+        }
+    }
+
+    void Die()
+    {
+        isDead = true;
+        StopAllCoroutines();
+        if (agent != null) agent.enabled = false;
+        anim.SetTrigger("Die");
+        Debug.Log("БОСС ПОВЕРЖЕН!");
+    }
+
     // --- Пул пуль ---
     private void PrepareBulletPool()
     {
         if (bulletPoolReady) return;
-
         GameObject parentObj = new GameObject(gameObject.name + "_BossBulletPool");
         bulletPoolParent = parentObj.transform;
 
@@ -341,30 +464,17 @@ public class BossController : MonoBehaviour
             bullet.SetReturnAction(ReturnBullet);
             bulletPool.Enqueue(bullet);
         }
-
         bulletPoolReady = true;
     }
 
     private BulletController GetBullet(Vector3 position, Quaternion rotation)
     {
         PrepareBulletPool();
-
-        BulletController bullet;
-
-        if (bulletPool.Count > 0)
-        {
-            bullet = bulletPool.Dequeue();
-        }
-        else
-        {
-            bullet = Instantiate(bulletPrefab, bulletPoolParent);
-            bullet.SetReturnAction(ReturnBullet);
-        }
-
+        BulletController bullet = bulletPool.Count > 0 ? bulletPool.Dequeue() : Instantiate(bulletPrefab, bulletPoolParent);
+        bullet.SetReturnAction(ReturnBullet);
         bullet.transform.SetPositionAndRotation(position, rotation);
         bullet.gameObject.SetActive(true);
         bullet.Fire();
-
         return bullet;
     }
 

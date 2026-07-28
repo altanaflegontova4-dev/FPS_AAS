@@ -27,6 +27,10 @@ public class UIController : MonoBehaviour
     public Text messageText; 
     public GameObject messagePanel;
 
+    [Header("Dialogue")]
+    public GameObject dialoguePanel;
+    public Text dialogueText;
+
     public void Awake()
     {
         instance = this;
@@ -98,5 +102,21 @@ public class UIController : MonoBehaviour
 
         if (healthText != null)
             healthText.text = "HP: " + currentHealth;
+    }
+
+    public void ShowDialogue(string text)
+    {
+        if (dialoguePanel != null)
+            dialoguePanel.SetActive(true);
+        if (dialogueText != null)
+            dialogueText.text = text;
+    }
+
+    public void HideDialogue()
+    {
+        if (dialoguePanel != null)
+            dialoguePanel.SetActive(false);
+        if (dialogueText != null)
+            dialogueText.text = "";
     }
 }

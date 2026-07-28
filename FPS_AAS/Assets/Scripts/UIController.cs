@@ -11,11 +11,6 @@ public class UIController : MonoBehaviour
     public Slider healthSlider;
     public Text healthText;
 
-    [Header("Boss Health")]
-    public Slider bossHealthSlider;
-    public Text bossHealthText;
-    public GameObject bossHealthPanel; 
-
     [Header("Ammo")]
     public Text ammoText;
 

@@ -10,8 +10,7 @@ public class NPCDialogue : MonoBehaviour, IInteractable
 
     [Header("Animation")]
     public Animator anim;
-    public string talkTrigger = "Talk";
-    public string idleTrigger = "Idle";
+    public string talkBool = "IsTalking"; // <-- Заменили два триггера на один Bool!
 
     [Header("Settings")]
     public float autoAdvanceTime = 4f; // секунд до автоскипа
@@ -47,9 +46,9 @@ public class NPCDialogue : MonoBehaviour, IInteractable
         isTalking = true;
         currentLine = 0;
 
-        // анимация разговора
+        // анимация разговора: включаем Bool
         if (anim != null)
-            anim.SetTrigger(talkTrigger);
+            anim.SetBool(talkBool, true);
 
         // показываем первую фразу
         ShowLine(currentLine);
@@ -91,9 +90,9 @@ public class NPCDialogue : MonoBehaviour, IInteractable
         isTalking = false;
         currentLine = 0;
 
-        // возврат в idle
+        // возврат в idle: выключаем Bool, и Аниматор сам вернет NPC в покой
         if (anim != null)
-            anim.SetTrigger(idleTrigger);
+            anim.SetBool(talkBool, false);
 
         UIController.instance.HideDialogue();
     }

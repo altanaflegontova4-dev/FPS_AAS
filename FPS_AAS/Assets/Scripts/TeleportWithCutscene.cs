@@ -12,6 +12,12 @@ public class TeleportWithCutscene : MonoBehaviour, IInteractable
     public Transform player;
     public Transform teleportTarget;
 
+    [Header("Assistant Settings")]
+    [Tooltip("Отключить ли ассистента перед боем с боссом?")]
+    public bool disableAssistant = true;
+    [Tooltip("Ссылка на GameObject ассистента/напарника")]
+    public GameObject assistantObject;
+
     [Header("UI Loading")]
     public CanvasGroup loadingScreenGroup;
     public float fadeSpeed = 4f;
@@ -30,7 +36,7 @@ public class TeleportWithCutscene : MonoBehaviour, IInteractable
     [Header("Boss")]
     public BossController bossController;
     public BossHealthController bossHealthController;
-    public float delayBeforeBoss = 3f; 
+    public float delayBeforeBoss = 3f;
 
     private bool isActivating = false;
 
@@ -72,7 +78,15 @@ public class TeleportWithCutscene : MonoBehaviour, IInteractable
         // 3. Экран загрузки
         yield return new WaitForSeconds(loadingDuration);
 
-        // 4. Телепортация
+        // --- ОТКЛЮЧЕНИЕ АССИСТЕНТА ---
+        // Отключаем его, пока экран полностью черный, чтобы он исчез бесшовно
+        if (disableAssistant && assistantObject != null)
+        {
+            assistantObject.SetActive(false);
+            Debug.Log("🤖 Ассистент успешно отключен перед боссом.");
+        }
+
+        // 4. Телепортация игрока
         TeleportPlayerSafe();
 
         // 5. Запускаем катсцену

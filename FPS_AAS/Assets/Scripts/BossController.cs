@@ -11,33 +11,44 @@ public class BossController : MonoBehaviour
     public Animator anim;
     private Transform player;
 
+    [Header("Boss State")]
+    public bool bossActivated = false;
+
     [Header("Damage Setting Combat")]
     public int chargeDamage = 10;
     public int slamDamage = 12;
+    public float pushForce = 10f;
 
     [Header("Combat Settings")]
     public float maxHealth = 100f;
     private float currentHealth;
     private bool isDead = false;
-    private bool isRaged = false; // Фаза 2 (<50% HP)
+    private bool isRaged = false;
 
     [Header("Tactical Spacing")]
-    public float personalSpace = 5f;    // Если игрок подошел вплотную — босс отталкивает или бьет
-    public float optimalRange = 12f;    // Оптимальная дистанция для ведения боя
-    public float maxChaseRange = 18f;   // Если игрок дальше — босс делает таран или бежит сокращать дистанцию
-    public float attackCooldown = 1.2f; // Пауза между атаками для создания напряжения!
+    public float personalSpace = 5f;
+    public float optimalRange = 12f;
+    public float maxChaseRange = 18f;
+    public float attackCooldown = 1.2f;
     private float cooldownTimer = 0f;
 
-    [Header("Line of Sight (Walls Check)")]
+    [Header("Line of Sight")]
     public LayerMask obstacleMask;
     public float eyeHeight = 1.5f;
 
-    [Header("Boss Bullet Pool")]
+    [Header("Normal Bullet Pool")]
     public BulletController bulletPrefab;
     public int bulletPoolSize = 40;
     private Queue<BulletController> bulletPool = new Queue<BulletController>();
     private Transform bulletPoolParent;
     private bool bulletPoolReady;
+
+    [Header("Homing Bullet Pool")]
+    public HomingBullet homingBulletPrefab;
+    public int homingPoolSize = 15;
+    private Queue<HomingBullet> homingPool = new Queue<HomingBullet>();
+    private Transform homingPoolParent;
+    private bool homingPoolReady;
 
     [Header("Weapon / Fire Points")]
     public Transform[] firePoints;
@@ -54,7 +65,6 @@ public class BossController : MonoBehaviour
 
     private bool isAttacking = false;
     private float stunTimer = 0f;
-
     private float normalSpeed;
     private float rageSpeed;
 
@@ -70,17 +80,18 @@ public class BossController : MonoBehaviour
         {
             normalSpeed = agent.speed;
             rageSpeed = normalSpeed * 1.35f;
-            agent.stoppingDistance = 6f; // ВАЖНО: Босс больше не липнет к лицу игрока!
+            agent.stoppingDistance = 6f;
         }
 
         PrepareBulletPool();
+        PrepareHomingPool();
     }
 
     void Update()
     {
+        if (!bossActivated) return;
         if (isDead || player == null) return;
 
-        // Обработка оглушения / получения урона
         if (stunTimer > 0f)
         {
             stunTimer -= Time.deltaTime;
@@ -92,7 +103,6 @@ public class BossController : MonoBehaviour
             return;
         }
 
-        // Переход в фазу ярости
         if (!isRaged && currentHealth <= maxHealth * 0.5f)
         {
             EnterRageMode();
@@ -100,7 +110,6 @@ public class BossController : MonoBehaviour
 
         if (isAttacking) return;
 
-        // Таймер передышки (чтобы босс не спамил атаки как пулемет, а давал игроку напряженный момент)
         if (cooldownTimer > 0f)
         {
             cooldownTimer -= Time.deltaTime;
@@ -111,43 +120,32 @@ public class BossController : MonoBehaviour
 
         float distToPlayer = Vector3.Distance(transform.position, player.position);
 
-        // Проверка видимости через стены
         if (!HasLineOfSight())
         {
-            ChasePlayer(2f); // Если игрок за стеной, подбегаем ближе
+            ChasePlayer(2f);
             return;
         }
 
-        // --- ТАКТИЧЕСКИЙ ИИ (СОЗДАНИЕ НАПРЯЖЕНИЯ) ---
-
         if (distToPlayer <= personalSpace)
         {
-            // 1. ИГРОК СЛИШКОМ БЛИЗКО: Босс наказывает за наглость мощным ударом вблизи!
             StopAgentAndFacePlayer();
             StartCoroutine(LeapSlamAttack());
         }
         else if (distToPlayer <= optimalRange)
         {
-            // 2. ОПТИМАЛЬНАЯ ЗОНА: Босс держит дистанцию (не лезет в лицо!) и ведет прицельный огонь
             StopAgentAndFacePlayer();
             HandleShootingRhythm(distToPlayer);
         }
         else if (distToPlayer <= maxChaseRange)
         {
-            // 3. ИГРОК ОТХОДИТ: Босс просто идет за ним, сохраняя дистанцию остановки (6 метров)
             ChasePlayer(6f);
         }
         else
         {
-            // 4. ИГРОК УБЕЖАЛ ДАЛЕКО: Идеальный момент для смертоносного тарана!
             if (isRaged || UnityEngine.Random.value < 0.75f)
-            {
                 StartCoroutine(ChargeAttack());
-            }
             else
-            {
                 ChasePlayer(5f);
-            }
         }
     }
 
@@ -235,15 +233,35 @@ public class BossController : MonoBehaviour
         return true;
     }
 
-    void EnterRageMode()
+    public void EnterRageMode()
     {
         isRaged = true;
         if (agent != null) agent.speed = rageSpeed;
-        attackCooldown = 0.6f; // В ярости передышки короче!
-        Debug.Log("БОСС В ЯРОСТИ! Скорость и агрессия повышены.");
+        attackCooldown = 0.6f;
+
+       
+        SkinnedMeshRenderer[] renderers = GetComponentsInChildren<SkinnedMeshRenderer>();
+
+        Debug.Log("SkinnedMeshRenderers found: " + renderers.Length);
+
+        foreach (SkinnedMeshRenderer r in renderers)
+        {
+            // создаём копию материала чтобы не менять оригинал
+            Material[] mats = r.materials;
+            foreach (Material mat in mats)
+            {
+                Debug.Log("Material: " + mat.name + " shader: " + mat.shader.name);
+                //mat.SetColor("_BaseColor", new Color(0.91f, 0.62f, 0.62f, 1f));
+                // также меняем цвет самой текстуры overlay
+                mat.SetColor("_EmissionColor", new Color(0.75f, 0f, 0f));
+                mat.EnableKeyword("_EMISSION");
+            }
+            r.materials = mats;
+        }
+
+        Debug.Log("БОСС В ЯРОСТИ!");
     }
 
-    // --- АТАКА 1: Стрельба очередьми ---
     IEnumerator ShootBurst(float initialDelay)
     {
         isAttacking = true;
@@ -257,11 +275,18 @@ public class BossController : MonoBehaviour
             foreach (Transform fp in firePoints)
             {
                 if (fp == null) continue;
-                Vector3 targetCenter = player.position + new Vector3(0f, 0.4f, 0f);
-                Vector3 dir = targetCenter - fp.position;
-                if (dir.sqrMagnitude < 0.01f) continue;
 
-                GetBullet(fp.position, Quaternion.LookRotation(dir));
+                if (isRaged)
+                {
+                    GetHomingBullet(fp.position, fp.rotation);
+                }
+                else
+                {
+                    Vector3 targetCenter = player.position + new Vector3(0f, 0.4f, 0f);
+                    Vector3 dir = targetCenter - fp.position;
+                    if (dir.sqrMagnitude < 0.01f) continue;
+                    GetBullet(fp.position, Quaternion.LookRotation(dir));
+                }
             }
 
             if (i < bulletsPerBurst - 1)
@@ -272,7 +297,6 @@ public class BossController : MonoBehaviour
         FinishAttack(isRaged ? 0.5f : attackCooldown);
     }
 
-    // --- Attack 2: Leap Slam
     IEnumerator LeapSlamAttack()
     {
         isAttacking = true;
@@ -284,13 +308,9 @@ public class BossController : MonoBehaviour
         float slamRadius = 4.5f;
         if (player != null && Vector3.Distance(transform.position, player.position) <= slamRadius)
         {
-            IDamagable player = PlayerController.instance.GetComponentInChildren<IDamagable>();
-
-            if (player != null)
-            {
-                player.TakeDamage(slamDamage, true);
-                Debug.Log("Player is damaged");
-            }
+            IDamagable playerDamagable = PlayerController.instance.GetComponentInChildren<IDamagable>();
+            if (playerDamagable != null)
+                playerDamagable.TakeDamage(slamDamage, true);
         }
 
         yield return new WaitForSeconds(0.6f);
@@ -299,10 +319,9 @@ public class BossController : MonoBehaviour
             agent.enabled = true;
             agent.isStopped = false;
         }
-        FinishAttack(attackCooldown * 1.2f); // После тяжелого прыжка босс дольше приходит в себя
+        FinishAttack(attackCooldown * 1.2f);
     }
 
-    // --- Attack 3: Charge
     IEnumerator ChargeAttack()
     {
         isAttacking = true;
@@ -349,33 +368,30 @@ public class BossController : MonoBehaviour
         {
             elapsed += Time.deltaTime;
 
-          
-                if (player != null && agent != null && agent.enabled)
+            if (player != null && agent != null && agent.enabled)
+            {
+                agent.destination = player.position;
+
+                float dist = Vector3.Distance(transform.position, player.position);
+
+                if (dist <= 3f)
                 {
-                    agent.destination = player.position;
-
-                    float dist = Vector3.Distance(transform.position, player.position);
-                    Debug.Log("Дистанция до игрока: " + dist); // добавь это
-
-                    if (dist <= 4.0f)
-                    {
-                    // урон...
                     hitPlayer = true;
-                    Debug.Log("Дистанция подходящая — пытаемся нанести урон");
 
                     IDamagable playerDamagable =
                         PlayerController.instance.GetComponentInChildren<IDamagable>();
-
                     if (playerDamagable != null)
-                    {
-                        Debug.Log("IDamagable найден — наносим урон " + chargeDamage);
                         playerDamagable.TakeDamage(chargeDamage, true);
-                    }
-                }
-                }
 
+                    PlayerController.instance.ApplyPush(
+                        (player.position - transform.position).normalized + Vector3.up * 0.2f,
+                        pushForce
+                    );
 
-                yield return null;
+                    break;
+                }
+            }
+            yield return null;
         }
 
         anim.SetBool("IsCharging", false);
@@ -399,7 +415,6 @@ public class BossController : MonoBehaviour
         FinishAttack(attackCooldown * 1.5f);
     }
 
-    // Вызывается в конце каждой атаки, чтобы задать паузу (ритм боя)
     void FinishAttack(float cooldown)
     {
         isAttacking = false;
@@ -415,9 +430,7 @@ public class BossController : MonoBehaviour
         hasStoppedForAttack = false;
 
         if (agent != null)
-        {
             agent.enabled = false;
-        }
 
         anim.SetTrigger("Hit");
     }
@@ -432,13 +445,10 @@ public class BossController : MonoBehaviour
     {
         if (isDead) return;
         currentHealth -= amount;
-
         StunByHit(0.25f);
 
         if (currentHealth <= 0)
-        {
             Die();
-        }
     }
 
     void Die()
@@ -447,10 +457,8 @@ public class BossController : MonoBehaviour
         StopAllCoroutines();
         if (agent != null) agent.enabled = false;
         anim.SetTrigger("Die");
-        Debug.Log("БОСС ПОВЕРЖЕН!");
     }
 
-    // --- Пул пуль ---
     private void PrepareBulletPool()
     {
         if (bulletPoolReady) return;
@@ -470,7 +478,9 @@ public class BossController : MonoBehaviour
     private BulletController GetBullet(Vector3 position, Quaternion rotation)
     {
         PrepareBulletPool();
-        BulletController bullet = bulletPool.Count > 0 ? bulletPool.Dequeue() : Instantiate(bulletPrefab, bulletPoolParent);
+        BulletController bullet = bulletPool.Count > 0
+            ? bulletPool.Dequeue()
+            : Instantiate(bulletPrefab, bulletPoolParent);
         bullet.SetReturnAction(ReturnBullet);
         bullet.transform.SetPositionAndRotation(position, rotation);
         bullet.gameObject.SetActive(true);
@@ -482,5 +492,40 @@ public class BossController : MonoBehaviour
     {
         bullet.gameObject.SetActive(false);
         bulletPool.Enqueue(bullet);
+    }
+
+    private void PrepareHomingPool()
+    {
+        if (homingPoolReady) return;
+        GameObject parentObj = new GameObject(gameObject.name + "_HomingBulletPool");
+        homingPoolParent = parentObj.transform;
+
+        for (int i = 0; i < homingPoolSize; i++)
+        {
+            HomingBullet bullet = Instantiate(homingBulletPrefab, homingPoolParent);
+            bullet.gameObject.SetActive(false);
+            bullet.SetReturnAction(ReturnHomingBullet);
+            homingPool.Enqueue(bullet);
+        }
+        homingPoolReady = true;
+    }
+
+    private HomingBullet GetHomingBullet(Vector3 position, Quaternion rotation)
+    {
+        PrepareHomingPool();
+        HomingBullet bullet = homingPool.Count > 0
+            ? homingPool.Dequeue()
+            : Instantiate(homingBulletPrefab, homingPoolParent);
+        bullet.SetReturnAction(ReturnHomingBullet);
+        bullet.transform.SetPositionAndRotation(position, rotation);
+        bullet.gameObject.SetActive(true);
+        bullet.Fire();
+        return bullet;
+    }
+
+    private void ReturnHomingBullet(HomingBullet bullet)
+    {
+        bullet.gameObject.SetActive(false);
+        homingPool.Enqueue(bullet);
     }
 }

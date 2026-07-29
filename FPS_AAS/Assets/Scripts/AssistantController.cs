@@ -1,7 +1,6 @@
 using UnityEngine;
 using UnityEngine.AI;
 
-
 public class AssistantController : MonoBehaviour
 {
     [Header("Linkage")]
@@ -10,37 +9,34 @@ public class AssistantController : MonoBehaviour
 
     [Header("Animator Settings")]
     public string isWalkingBool = "IsWalking";
-    public float combatAnimSpeed = 1.4f;
 
     [Header("Position Offsets")]
     [Tooltip("Позиция рядом с игроком (X = вправо/влево, Z = вперед/назад)")]
     public Vector3 peaceOffset = new Vector3(1.5f, 0f, 0.5f);
 
-    [Tooltip("На сколько метров робот отходит за спину во время БОЯ")]
-    public float hideDistanceInCombat = 4.5f;
-
     [Header("Movement Sensitivity")]
-    [Tooltip("Минимальное расстояние (в метрах), на которое должен сдвинуться игрок, чтобы робот обновил цель (чтобы игрок мог свободно крутить мышкой)")]
+    [Tooltip("Минимальное расстояние (в метрах), на которое должен сдвинуться игрок, чтобы робот обновил цель")]
     public float playerMoveThreshold = 0.3f;
 
     [Header("Speed")]
     public float normalSpeed = 3.5f;
-    public float panicRunSpeed = 5.5f;
 
     [Header("Stuck Insurance")]
     public float teleportDistance = 8f;
 
-    private bool isInCombat = false;
     private NavMeshAgent agent;
 
     // Переменные для отслеживания движения игрока
     private Vector3 lastPlayerPosition;
     private Vector3 targetDestination;
 
-    void Start()
+    void Awake()
     {
         agent = GetComponent<NavMeshAgent>();
+    }
 
+    void Start()
+    {
         if (player == null)
         {
             GameObject p = GameObject.FindGameObjectWithTag("Player");
@@ -60,43 +56,24 @@ public class AssistantController : MonoBehaviour
     {
         if (player == null) return;
 
-        // --- СТРАХОВКА: Телепорт при застревании ---
+        // --- СТРАХОВКА: Телепорт при застревании в мирное время ---
         if (Vector3.Distance(transform.position, player.position) > teleportDistance)
         {
-            Vector3 warpPosition = player.TransformPoint(peaceOffset);
-            agent.Warp(warpPosition);
-            targetDestination = warpPosition;
+            TeleportToPlayer();
+        }
+
+        // Логика следования за игроком
+        agent.stoppingDistance = 0.3f;
+        agent.speed = normalSpeed;
+        if (anim != null) anim.speed = 1.0f;
+
+        float playerMovedDistance = Vector3.Distance(player.position, lastPlayerPosition);
+
+        if (playerMovedDistance > playerMoveThreshold)
+        {
+            targetDestination = player.TransformPoint(peaceOffset);
+            agent.SetDestination(targetDestination);
             lastPlayerPosition = player.position;
-        }
-
-        if (!isInCombat)
-        {
-            agent.stoppingDistance = 0.3f;
-            agent.speed = normalSpeed;
-            if (anim != null) anim.speed = 1.0f;
-
-            // Проверяем: насколько игрок сдвинулся ИМЕННО ПО КООРДИНАТАМ (игнорируя вращение мыши)
-            float playerMovedDistance = Vector3.Distance(player.position, lastPlayerPosition);
-
-            if (playerMovedDistance > playerMoveThreshold)
-            {
-                // Игрок действительно идет — вычисляем новую точку рядом и отправляем туда робота
-                targetDestination = player.TransformPoint(peaceOffset);
-                agent.SetDestination(targetDestination);
-
-                // Запоминаем новую позицию игрока
-                lastPlayerPosition = player.position;
-            }
-        }
-        else
-        {
-            // === БОЕВОЙ РЕЖИМ ===
-            agent.stoppingDistance = 0.5f;
-            agent.speed = panicRunSpeed;
-            if (anim != null) anim.speed = combatAnimSpeed;
-
-            Vector3 hidePosition = player.position - (player.forward * hideDistanceInCombat);
-            agent.SetDestination(hidePosition);
         }
 
         // --- УПРАВЛЕНИЕ АНИМАЦИЕЙ ---
@@ -112,8 +89,33 @@ public class AssistantController : MonoBehaviour
         if (anim != null) anim.speed = 1.0f;
     }
 
+    /// <summary>
+    /// Переключение боевого режима
+    /// </summary>
     public void SetCombatState(bool inCombat)
     {
-        isInCombat = inCombat;
+        if (inCombat)
+        {
+            // ПРЯЧЕМ: Отключаем весь GameObject робота во время боя
+            gameObject.SetActive(false);
+        }
+        else
+        {
+            // ВОЗВРАЩАЕМ: Включаем обратно
+            gameObject.SetActive(true);
+
+            // Появляемся сразу сбоку от игрока, чтобы не бежать из старого места
+            TeleportToPlayer();
+        }
+    }
+
+    private void TeleportToPlayer()
+    {
+        if (player == null || agent == null) return;
+
+        Vector3 warpPosition = player.TransformPoint(peaceOffset);
+        agent.Warp(warpPosition);
+        targetDestination = warpPosition;
+        lastPlayerPosition = player.position;
     }
 }

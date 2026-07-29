@@ -1,3 +1,4 @@
+using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -17,11 +18,20 @@ public class PlayerController : MonoBehaviour
     public float mouseSensitivity;
 
     public GameObject bullet;
-    public Transform firePoint;
 
     public Gun activeGun;
-    public List <Gun> allGuns = new List<Gun> ();
+    public List<Gun> allGuns = new List<Gun>();
     public int currentGun;
+
+    [Header("Weapon Switch Delay")]
+    [Tooltip("Время анимации убирания оружия перед доставанием нового")]
+    public float switchGunDelay = 0.25f;
+
+    [Header("Weapon Holder")]
+    [Tooltip("Объект в камере, куда спавнится новое оружие (можно оставить пустым, тогда спавнится в camTrans)")]
+    public Transform weaponHolder;
+    private bool isSwitchingGun = false;
+
     public void Awake()
     {
         instance = this;
@@ -29,70 +39,69 @@ public class PlayerController : MonoBehaviour
 
     void Start()
     {
+        // Подготавливаем пули для всех имеющихся пушек
         for (int i = 0; i < allGuns.Count; i++)
         {
-            allGuns[i].PreparePool();//create set of bullets one time
+            if (allGuns[i] != null)
+            {
+                allGuns[i].PreparePool();
+            }
         }
 
-        //charCon = GetComponent<CharacterController>();//one way to get character controller component
-        activeGun = allGuns[currentGun];
-        activeGun.gameObject.SetActive (true);
-        activeGun.UpdateAmmoUI();
-
+        // Активируем стартовое оружие
+        if (allGuns.Count > 0 && currentGun < allGuns.Count && allGuns[currentGun] != null)
+        {
+            activeGun = allGuns[currentGun];
+            activeGun.gameObject.SetActive(true);
+            activeGun.PlayUnhide();
+            activeGun.UpdateAmmoUI();
+        }
+        else
+        {
+            Debug.LogError("PlayerController: Список All Guns пуст или текущее оружие не назначено в Inspector!");
+        }
     }
 
-   //no physics in character, so no fix update
     void Update()
     {
-
+        // Логика отталкивания
         if (pushVelocity.magnitude > 0.1f)
         {
             charCon.Move(pushVelocity * Time.deltaTime);
             pushVelocity = Vector3.Lerp(pushVelocity, Vector3.zero, pushDecay * Time.deltaTime);
         }
 
-        //  moveInput.x = Input.GetAxis("Horizontal") * moveSpeed * Time.deltaTime;
-        //  moveInput.z = Input.GetAxis("Vertical") * moveSpeed * Time.deltaTime;
+        // Логика движения игрока
+        float yStore = moveInput.y;
 
-        float yStore = moveInput.y;//store initial position to prevent gravity confusion
+        Vector3 vertMove = transform.forward * Input.GetAxis("Vertical");
+        Vector3 horiMove = transform.right * Input.GetAxis("Horizontal");
 
-
-        //move based on player's facing direction
-        Vector3 vertMove = transform.forward * Input.GetAxis("Vertical"); //Z axis
-        Vector3 horiMove = transform.right * Input.GetAxis("Horizontal"); //X axis
-
-        moveInput=vertMove + horiMove;
-        moveInput.Normalize(); //horizontal movement is normal and not fast
-
+        moveInput = vertMove + horiMove;
+        moveInput.Normalize();
 
         if (Input.GetKey(KeyCode.LeftShift))
         {
-            //running speed
-            moveInput = moveInput * runSpeed;
-
+            moveInput *= runSpeed;
         }
         else
         {
-            //walking speed
-            moveInput = moveInput * moveSpeed;
+            moveInput *= moveSpeed;
         }
-        
-     
-        moveInput.y = yStore; //continue journey
 
-        moveInput.y += Physics.gravity.y * gravityModifier * Time.deltaTime; //aplying gravity to character
+        moveInput.y = yStore;
+        moveInput.y += Physics.gravity.y * gravityModifier * Time.deltaTime;
 
-        if (charCon.isGrounded)//detect ground
+        if (charCon.isGrounded)
         {
-            moveInput.y = -1f; //to neutralize position of the player
-            moveInput.y += Physics.gravity.y * gravityModifier * Time.deltaTime; //aply gravity again when touching ground
-            
+            moveInput.y = -1f;
+            moveInput.y += Physics.gravity.y * gravityModifier * Time.deltaTime;
+
             if (Input.GetKeyDown(KeyCode.Space))
             {
                 moveInput.y = jumpPower;
                 jumpAgain = 2;
             }
-            
         }
 
         if (jumpAgain > 0 && Input.GetKeyDown(KeyCode.Space))
@@ -101,31 +110,30 @@ public class PlayerController : MonoBehaviour
             jumpAgain--;
         }
 
-     
-
         charCon.Move(moveInput * Time.deltaTime);
 
-        float horizontalSpeed = new Vector3(charCon.velocity.x,0, charCon.velocity.z).magnitude;
+        float horizontalSpeed = new Vector3(charCon.velocity.x, 0, charCon.velocity.z).magnitude;
+        if (anim != null)
+        {
+            anim.SetFloat("moveSpeed", horizontalSpeed);
+        }
 
-        anim.SetFloat("moveSpeed", horizontalSpeed);
-
-        //Player looking rotation
-        Vector2 mouseInput = new Vector2(Input.GetAxisRaw ("Mouse X"), Input.GetAxisRaw("Mouse Y")) * mouseSensitivity; //mouse is moving in 2d - left/right and up/down
+        // Поворот камеры и игрока
+        Vector2 mouseInput = new Vector2(Input.GetAxisRaw("Mouse X"), Input.GetAxisRaw("Mouse Y")) * mouseSensitivity;
         transform.rotation = Quaternion.Euler(transform.rotation.eulerAngles.x, transform.rotation.eulerAngles.y + mouseInput.x, transform.rotation.eulerAngles.z);
         camTrans.rotation = Quaternion.Euler(camTrans.rotation.eulerAngles + new Vector3(-mouseInput.y, 0f, 0f));
 
+        // --- ЗАЩИТА: Если оружия нет, перезаряжается или меняется — выходим ---
+        if (activeGun == null || activeGun.isReloading || isSwitchingGun) return;
 
-        //Handle the shooting
-        if (activeGun.isReloading) return;
-
+        // Перезарядка
         if (Input.GetKeyDown(KeyCode.R))
         {
             activeGun.Reload();
-            Debug.Log("R is pressed");
         }
 
-
-        if (activeGun.currentAmmo > 0)
+        // Атака / Стрельба
+        if (activeGun.isMelee || activeGun.currentAmmo > 0)
         {
             if (Input.GetMouseButtonDown(0) && activeGun.fireCounter <= 0)
             {
@@ -137,7 +145,7 @@ public class PlayerController : MonoBehaviour
             }
         }
 
-      
+        // Смена оружия
         if (Input.GetKeyDown(KeyCode.Tab))
         {
             switchGun();
@@ -151,45 +159,145 @@ public class PlayerController : MonoBehaviour
 
     public void fireShot()
     {
-        if (activeGun.currentAmmo <= 0)
-        {
-            return;
-        }
+        if (activeGun == null) return;
 
-        RaycastHit hit;
+        // 1. Анимация атаки
+        activeGun.PlayFire();
 
-        if (Physics.Raycast(camTrans.position, camTrans.forward, out hit, 50f))
+        if (activeGun.isMelee)
         {
-            firePoint.LookAt(hit.point);
+            RaycastHit hit;
+            if (Physics.Raycast(camTrans.position, camTrans.forward, out hit, activeGun.meleeRange))
+            {
+                // Ищем интерфейс IDamagable на объекте или его родителях (как у тебя в BulletController)
+                IDamagable damageable = hit.collider.GetComponentInParent<IDamagable>();
+
+                if (damageable != null)
+                {
+                    // Передаем урон ножа и false (так как атакует ИГРОК, а не по игроку)
+                    damageable.TakeDamage(activeGun.meleeDamage, false);
+                }
+            }
         }
+        // --- ЛОГИКА ОГНЕСТРЕЛА ---
         else
         {
-            firePoint.LookAt(camTrans.position + camTrans.forward * 30f);
+            if (activeGun.currentAmmo <= 0) return;
+
+            if (activeGun.firePoint == null)
+            {
+                Debug.LogError("FirePoint не назначен на пушке: " + activeGun.gameObject.name);
+                return;
+            }
+
+            RaycastHit hit;
+            if (Physics.Raycast(camTrans.position, camTrans.forward, out hit, 50f))
+            {
+                activeGun.firePoint.LookAt(hit.point);
+            }
+            else
+            {
+                activeGun.firePoint.LookAt(camTrans.position + camTrans.forward * 30f);
+            }
+
+            activeGun.currentAmmo--;
+            activeGun.GetBullet(activeGun.firePoint.position, activeGun.firePoint.rotation);
         }
 
-        activeGun.currentAmmo--;
-
-        activeGun.GetBullet(firePoint.position, firePoint.rotation);
-
         activeGun.fireCounter = activeGun.fireRate;
-
         activeGun.UpdateAmmoUI();
-
     }
 
     public void switchGun()
     {
-        activeGun.gameObject.SetActive(false);
+        if (allGuns.Count <= 1) return;
+        StartCoroutine(SwitchGunCoroutine());
+    }
+
+    private IEnumerator SwitchGunCoroutine()
+    {
+        isSwitchingGun = true;
+
+        if (activeGun != null)
+        {
+            activeGun.PlayHide();
+        }
+
+        yield return new WaitForSeconds(switchGunDelay);
+
+        if (activeGun != null)
+        {
+            activeGun.gameObject.SetActive(false);
+        }
 
         currentGun++;
-        
-        if(currentGun>=allGuns.Count)
+        if (currentGun >= allGuns.Count)
         {
             currentGun = 0;
         }
 
         activeGun = allGuns[currentGun];
+        if (activeGun != null)
+        {
+            activeGun.gameObject.SetActive(true);
+            activeGun.PlayUnhide();
+            activeGun.UpdateAmmoUI();
+        }
+
+        isSwitchingGun = false;
+    }
+
+    public void AddWeapon(Gun gunPrefab)
+    {
+        if (gunPrefab == null) return;
+
+        // 1. Проверяем: если такое оружие уже есть в инвентаре
+        for (int i = 0; i < allGuns.Count; i++)
+        {
+            if (allGuns[i] != null && allGuns[i].ammoType == gunPrefab.ammoType)
+            {
+                // Если оружие уже есть — просто пополняем патроны
+                allGuns[i].AddAmmo(allGuns[i].maxReserveAmmo);
+
+                if (UIController.instance != null)
+                {
+                    UIController.instance.ShowMessage("Added ammo for " + allGuns[i].ammoType);
+                }
+                return;
+            }
+        }
+
+        // 2. Если оружия нет — создаем его в руках у игрока
+        Transform parentTransform = weaponHolder != null ? weaponHolder : camTrans;
+        Gun newGun = Instantiate(gunPrefab, parentTransform);
+
+        // Сохраняем локальную позицию и поворот префаба
+        newGun.transform.localPosition = gunPrefab.transform.localPosition;
+        newGun.transform.localRotation = gunPrefab.transform.localRotation;
+        newGun.transform.localScale = gunPrefab.transform.localScale;
+
+        // Подготавливаем пули для нового пулемета/автомата
+        newGun.PreparePool();
+
+        // 3. Выключаем текущее активное оружие
+        if (activeGun != null)
+        {
+            activeGun.gameObject.SetActive(false);
+        }
+
+        // 4. Добавляем новое оружие в список и переключаемся на него
+        allGuns.Add(newGun);
+        currentGun = allGuns.Count - 1;
+        activeGun = allGuns[currentGun];
+
+        // Включаем и проигрываем анимацию доставания
         activeGun.gameObject.SetActive(true);
+        activeGun.PlayUnhide();
         activeGun.UpdateAmmoUI();
+
+        if (UIController.instance != null)
+        {
+            UIController.instance.ShowMessage("Picked up " + newGun.ammoType + "!");
+        }
     }
 }

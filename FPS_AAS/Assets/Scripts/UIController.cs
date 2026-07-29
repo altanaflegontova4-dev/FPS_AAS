@@ -36,6 +36,15 @@ public class UIController : MonoBehaviour
     public Text dialogueTextPA;
     public Text speakerNameText;
 
+    [Header("Note")]
+    public GameObject notePanel;
+    public Text noteTitleText;
+    public Text noteBodyText;
+    public UnityEngine.UI.Image noteImageUI;
+
+    [Header("Crosshair")]
+    public GameObject crosshair;
+
     public void Awake()
     {
         instance = this;
@@ -49,7 +58,13 @@ public class UIController : MonoBehaviour
 
     void Update()
     {
-
+        if (notePanel != null && notePanel.activeSelf)
+        {
+            if (Input.GetKeyDown(KeyCode.E))
+            {
+                HideNote();
+            }
+        }
     }
 
     public void ShowInteractPrompt(string text)
@@ -139,5 +154,44 @@ public class UIController : MonoBehaviour
     {
         if (dialoguePanelPA != null)
             dialoguePanelPA.SetActive(false);
+    }
+
+    public void ShowNote(string title, string body, Sprite image = null)
+    {
+        if (notePanel != null)
+            notePanel.SetActive(true);
+
+        if (noteTitleText != null)
+            noteTitleText.text = title;
+
+        if (noteBodyText != null)
+            noteBodyText.text = body;
+
+        if (noteImageUI != null && image != null)
+            noteImageUI.sprite = image;
+
+        // скрываем crosshair
+        if (crosshair != null)
+            crosshair.SetActive(false);
+
+        // показываем курсор чтобы можно было закрыть
+        Cursor.lockState = CursorLockMode.None;
+        Cursor.visible = true;
+    }
+
+    public void HideNote()
+    {
+        if (notePanel != null)
+            notePanel.SetActive(false);
+
+        if (crosshair != null)
+            crosshair.SetActive(true);
+
+        // скрываем курсор обратно
+        Cursor.lockState = CursorLockMode.Locked;
+        Cursor.visible = false;
+
+        // разблокируем игрока
+        PlayerController.instance.enabled = true;
     }
 }

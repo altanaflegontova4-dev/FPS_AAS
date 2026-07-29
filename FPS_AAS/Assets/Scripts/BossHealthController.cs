@@ -4,7 +4,8 @@ using UnityEngine.AI;
 public class BossHealthController : MonoBehaviour, IDamagable
 {
     [Header("Health & Settings")]
-    public int currentHealth = 100;
+    public int maxHealth = 100;
+    public int currentHealth;
     public Animator anim;
 
     public BossController bossController;
@@ -13,12 +14,54 @@ public class BossHealthController : MonoBehaviour, IDamagable
     public float hitStunDuration = 0.5f;
     public float destroyDelay = 6f;
 
+    void Start()
+    {
+        currentHealth = maxHealth;
+
+        // скрываем health bar босса до начала боя
+        if (UIController.instance.bossHealthPanel != null)
+            UIController.instance.bossHealthPanel.SetActive(false);
+    }
+
+   
+    public void ActivateBossUI()
+    {
+        if (UIController.instance.bossHealthPanel != null)
+            UIController.instance.bossHealthPanel.SetActive(true);
+
+        if (UIController.instance.bossHealthSlider != null)
+        {
+            UIController.instance.bossHealthSlider.maxValue = maxHealth;
+            UIController.instance.bossHealthSlider.value = currentHealth;
+        }
+
+        if (UIController.instance.bossHealthText != null)
+            UIController.instance.bossHealthText.text = "OVERSEER: " + currentHealth + "/" + maxHealth;
+    }
+
+    void UpdateBossUI()
+    {
+        if (UIController.instance.bossHealthSlider != null)
+            UIController.instance.bossHealthSlider.value = currentHealth;
+
+        if (UIController.instance.bossHealthText != null)
+            UIController.instance.bossHealthText.text = "OVERSEER: " + currentHealth + "/" + maxHealth;
+    }
+
     public void TakeDamage(int damage, bool attackPlayer)
     {
         if (attackPlayer || isDead) return;
 
         currentHealth -= damage;
-        Debug.Log("Boss Health: " + currentHealth);
+        currentHealth = Mathf.Max(currentHealth, 0);
+
+        UpdateBossUI();
+
+        // проверяем rage режим
+        if (currentHealth <= maxHealth / 2 && bossController != null)
+        {
+            bossController.EnterRageMode();
+        }
 
         if (currentHealth <= 0)
         {
@@ -36,15 +79,17 @@ public class BossHealthController : MonoBehaviour, IDamagable
         if (agent != null) agent.enabled = false;
 
         if (bossController != null)
-        {
             bossController.StunByHit(hitStunDuration);
-        }
     }
 
     void Die()
     {
         isDead = true;
         anim.SetTrigger("Die");
+
+        // скрываем health bar при смерти
+        if (UIController.instance.bossHealthPanel != null)
+            UIController.instance.bossHealthPanel.SetActive(false);
 
         if (bossController != null)
         {
@@ -55,12 +100,9 @@ public class BossHealthController : MonoBehaviour, IDamagable
         NavMeshAgent agent = GetComponent<NavMeshAgent>();
         if (agent != null) agent.enabled = false;
 
-        // Аккуратно опускаем босса на землю при смерти
         RaycastHit hit;
         if (Physics.Raycast(transform.position + Vector3.up * 1f, Vector3.down, out hit, 4f))
-        {
             transform.position = hit.point;
-        }
 
         Collider col = GetComponent<Collider>();
         if (col != null) col.enabled = false;

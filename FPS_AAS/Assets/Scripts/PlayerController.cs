@@ -11,6 +11,9 @@ public class PlayerController : MonoBehaviour
     private int jumpAgain;
     public Animator anim;
 
+    private Vector3 pushVelocity = Vector3.zero;
+    public float pushDecay = 5f;
+
     public float mouseSensitivity;
 
     public GameObject bullet;
@@ -41,6 +44,13 @@ public class PlayerController : MonoBehaviour
    //no physics in character, so no fix update
     void Update()
     {
+
+        if (pushVelocity.magnitude > 0.1f)
+        {
+            charCon.Move(pushVelocity * Time.deltaTime);
+            pushVelocity = Vector3.Lerp(pushVelocity, Vector3.zero, pushDecay * Time.deltaTime);
+        }
+
         //  moveInput.x = Input.GetAxis("Horizontal") * moveSpeed * Time.deltaTime;
         //  moveInput.z = Input.GetAxis("Vertical") * moveSpeed * Time.deltaTime;
 
@@ -132,6 +142,11 @@ public class PlayerController : MonoBehaviour
         {
             switchGun();
         }
+    }
+
+    public void ApplyPush(Vector3 direction, float force)
+    {
+        pushVelocity = direction * force;
     }
 
     public void fireShot()

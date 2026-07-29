@@ -31,6 +31,11 @@ public class UIController : MonoBehaviour
     public GameObject dialoguePanel;
     public Text dialogueText;
 
+    [Header("DialoguePA")]
+    public GameObject dialoguePanelPA;
+    public Text dialogueTextPA;
+    public Text speakerNameText;
+
     public void Awake()
     {
         instance = this;
@@ -118,5 +123,21 @@ public class UIController : MonoBehaviour
             dialoguePanel.SetActive(false);
         if (dialogueText != null)
             dialogueText.text = "";
+    }
+
+    public void ShowDialoguePA(string speaker, string text)
+    {
+        if (dialoguePanelPA != null)
+            dialoguePanelPA.SetActive(true);
+        if (speakerNameText != null)
+            speakerNameText.text = speaker;
+        if (dialogueTextPA != null)
+            dialogueTextPA.text = text;
+    }
+
+    public void HideDialoguePA()
+    {
+        if (dialoguePanelPA != null)
+            dialoguePanelPA.SetActive(false);
     }
 }

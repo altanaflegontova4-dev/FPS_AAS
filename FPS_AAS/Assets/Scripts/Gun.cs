@@ -48,6 +48,7 @@ public class Gun : MonoBehaviour
         }
         if (reserveAmmo == 0)
         {
+            PlayerController.instance.PlaySFX(PlayerController.instance.outofammoSound);
             UIController.instance.ammoText.text = "Out of ammo";
         }
     }

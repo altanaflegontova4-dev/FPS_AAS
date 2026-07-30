@@ -11,6 +11,37 @@ public class PlayerController : MonoBehaviour
     private int jumpAgain;
     public Animator anim;
 
+    AudioSource AS;
+    AudioSource ASbg;
+    AudioSource ASambient;
+
+    public AudioClip[] walkStep;
+    public AudioClip[] sprintStep;
+    public AudioClip jumpclothSound;
+    public AudioClip shootSound;
+    public AudioClip deathSound;
+    public AudioClip switchgunSound;
+    public AudioClip doorSound;
+    public AudioClip reloadSound;
+    public AudioClip usemedkitSound;
+    public AudioClip useammoSound;
+    public AudioClip outofammoSound;
+    public AudioClip[] gethitSound;
+    public AudioClip pickupSound;
+    public AudioClip switchSound;
+    public AudioClip healthfullSound;
+
+
+
+
+    public AudioClip bgSound;
+    public AudioClip ambientSound;
+
+    private int lastFootstep = -1;
+    private float footstepTimer;
+    public float walkStepDelay = 0.5f;
+    public float sprintStepDelay = 0.25f;
+
     private Vector3 pushVelocity = Vector3.zero;
     public float pushDecay = 5f;
 
@@ -22,13 +53,58 @@ public class PlayerController : MonoBehaviour
     public Gun activeGun;
     public List <Gun> allGuns = new List<Gun> ();
     public int currentGun;
+
+    private float noAmmoCooldown = 0f;
+    public float noAmmoDelay = 0.3f;
+
     public void Awake()
     {
         instance = this;
     }
 
-    void Start()
+    public void PlaySFX(AudioClip clip, float volume = 3f)
     {
+        AS.PlayOneShot(clip, volume);
+    }
+
+    public void PlayRandomHitSound()
+    {
+        if (gethitSound.Length == 0) return;
+
+        int index = Random.Range(0, gethitSound.Length);
+        AS.PlayOneShot(gethitSound[index], 4.5f);
+    }
+
+    public void PlayRandomStepSound()
+    {
+        if (walkStep.Length == 0) return;
+
+        int index = Random.Range(0, walkStep.Length);
+        AS.PlayOneShot(walkStep[index]);
+    }
+
+
+
+    int randomIndex;
+
+void Start()
+    {
+        AudioSource[] sources = GetComponents<AudioSource>();
+
+        AS = sources[0];
+        ASbg = sources[1];
+        ASambient = sources[2];
+
+        ASbg.clip = bgSound;
+        ASbg.loop = true;
+        ASbg.volume = 0.15f;
+        ASbg.Play();
+
+        ASambient.clip = ambientSound;
+        ASambient.loop = true;
+        ASambient.volume = 0.1f;
+        ASambient.Play();
+
         for (int i = 0; i < allGuns.Count; i++)
         {
             allGuns[i].PreparePool();//create set of bullets one time
@@ -44,6 +120,11 @@ public class PlayerController : MonoBehaviour
    //no physics in character, so no fix update
     void Update()
     {
+        if (noAmmoCooldown > 0)
+        {
+            noAmmoCooldown -= Time.deltaTime;
+        }
+            
 
         if (pushVelocity.magnitude > 0.1f)
         {
@@ -91,6 +172,8 @@ public class PlayerController : MonoBehaviour
             {
                 moveInput.y = jumpPower;
                 jumpAgain = 2;
+
+                AS.PlayOneShot(jumpclothSound, 2f);
             }
             
         }
@@ -109,6 +192,47 @@ public class PlayerController : MonoBehaviour
 
         anim.SetFloat("moveSpeed", horizontalSpeed);
 
+        // Footstep sounds
+        if (charCon.isGrounded && horizontalSpeed > 0.1f)
+        {
+            footstepTimer -= Time.deltaTime;
+
+            if (footstepTimer <= 0f)
+            {
+                AudioClip[] currentSteps;
+                float stepDelay;
+
+                if (Input.GetKey(KeyCode.LeftShift))
+                {
+                    currentSteps = sprintStep;
+                    stepDelay = sprintStepDelay;
+                }
+                else
+                {
+                    currentSteps = walkStep;
+                    stepDelay = walkStepDelay;
+                }
+
+                int randomIndex;
+
+                do
+                {
+                    randomIndex = Random.Range(0, currentSteps.Length);
+                }
+                while (randomIndex == lastFootstep && currentSteps.Length > 1);
+
+                lastFootstep = randomIndex;
+
+                AS.PlayOneShot(currentSteps[randomIndex], 2f);
+
+                footstepTimer = stepDelay;
+            }
+        }
+        else
+        {
+            footstepTimer = 0f;
+        }
+
         //Player looking rotation
         Vector2 mouseInput = new Vector2(Input.GetAxisRaw ("Mouse X"), Input.GetAxisRaw("Mouse Y")) * mouseSensitivity; //mouse is moving in 2d - left/right and up/down
         transform.rotation = Quaternion.Euler(transform.rotation.eulerAngles.x, transform.rotation.eulerAngles.y + mouseInput.x, transform.rotation.eulerAngles.z);
@@ -120,21 +244,21 @@ public class PlayerController : MonoBehaviour
 
         if (Input.GetKeyDown(KeyCode.R))
         {
+            AS.PlayOneShot(reloadSound, 2.5f);
+
             activeGun.Reload();
             Debug.Log("R is pressed");
         }
 
 
-        if (activeGun.currentAmmo > 0)
+        if (Input.GetMouseButtonDown(0) && activeGun.fireCounter <= 0)
         {
-            if (Input.GetMouseButtonDown(0) && activeGun.fireCounter <= 0)
-            {
-                fireShot();
-            }
-            if (Input.GetMouseButton(0) && activeGun.canAutoFire && activeGun.fireCounter <= 0)
-            {
-                fireShot();
-            }
+            fireShot();
+        }
+
+        if (Input.GetMouseButton(0) && activeGun.canAutoFire && activeGun.fireCounter <= 0)
+        {
+            fireShot();
         }
 
       
@@ -151,10 +275,19 @@ public class PlayerController : MonoBehaviour
 
     public void fireShot()
     {
+
         if (activeGun.currentAmmo <= 0)
         {
+            if (noAmmoCooldown <= 0f)
+            {
+                PlaySFX(outofammoSound, 3f);
+                noAmmoCooldown = noAmmoDelay;
+            }
+
             return;
         }
+
+        AS.PlayOneShot(shootSound);
 
         RaycastHit hit;
 
@@ -179,6 +312,8 @@ public class PlayerController : MonoBehaviour
 
     public void switchGun()
     {
+        AS.PlayOneShot(switchgunSound,3f);
+
         activeGun.gameObject.SetActive(false);
 
         currentGun++;
@@ -193,3 +328,4 @@ public class PlayerController : MonoBehaviour
         activeGun.UpdateAmmoUI();
     }
 }
+

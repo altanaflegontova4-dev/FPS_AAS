@@ -59,6 +59,7 @@ public class PlayerHealthController : MonoBehaviour, IDamagable
        //no medkits
         if (medkitsCount <= 0)
         {
+            PlayerController.instance.PlaySFX(PlayerController.instance.healthfullSound, 2f);
             UIController.instance.ShowMessage("No medkits!");
             return;
         }
@@ -66,11 +67,13 @@ public class PlayerHealthController : MonoBehaviour, IDamagable
         // if full health
         if (currentHealth >= maxHealth)
         {
+            PlayerController.instance.PlaySFX(PlayerController.instance.healthfullSound, 2f);
             UIController.instance.ShowMessage("Health is already full!");
             return;
         }
 
         // okee
+        PlayerController.instance.PlaySFX(PlayerController.instance.usemedkitSound, 4f);
         healPlayer(healAmountPerMedkit);
         medkitsCount--;
 
@@ -98,13 +101,15 @@ public class PlayerHealthController : MonoBehaviour, IDamagable
             if (invincibleCounter <= 0)
             {
                 currentHealth -= damage;
+                PlayerController.instance.PlayRandomHitSound();
 
                 if (currentHealth <= 0)
                 {
-                    transform.parent.gameObject.SetActive(false);
-
                     currentHealth = 0;
 
+                    PlayerController.instance.PlaySFX(PlayerController.instance.deathSound);
+
+                    transform.parent.gameObject.SetActive(false);
                     GameManager.instance.PlayerDied();
                 }
             }

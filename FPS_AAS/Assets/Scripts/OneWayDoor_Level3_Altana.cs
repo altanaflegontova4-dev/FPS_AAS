@@ -23,6 +23,8 @@ public class OneWayDoor : MonoBehaviour, IInteractable
         }
         else
         {
+            PlayerController.instance.PlaySFX(PlayerController.instance.doorSound);
+
             OpenDoor();
         }
     }

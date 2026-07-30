@@ -11,7 +11,7 @@ GameObject:
   - component: {fileID: 4937598476633816743}
   - component: {fileID: 704717911979805874}
   - component: {fileID: 6952382168337541521}
-  m_Layer: 6
+  m_Layer: 7
   m_Name: Point Light
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -137,15 +137,15 @@ PrefabInstance:
     m_Modifications:
     - target: {fileID: -8679921383154817045, guid: 23ead67d7240eec4ca8a334e1a6f810c, type: 3}
       propertyPath: m_LocalPosition.x
-      value: 32.066
+      value: 67.94664
       objectReference: {fileID: 0}
     - target: {fileID: -8679921383154817045, guid: 23ead67d7240eec4ca8a334e1a6f810c, type: 3}
       propertyPath: m_LocalPosition.y
-      value: 10.134246
+      value: 7.5
       objectReference: {fileID: 0}
     - target: {fileID: -8679921383154817045, guid: 23ead67d7240eec4ca8a334e1a6f810c, type: 3}
       propertyPath: m_LocalPosition.z
-      value: 94.942
+      value: 92.37691
       objectReference: {fileID: 0}
     - target: {fileID: -8679921383154817045, guid: 23ead67d7240eec4ca8a334e1a6f810c, type: 3}
       propertyPath: m_LocalRotation.w
@@ -185,11 +185,11 @@ PrefabInstance:
       objectReference: {fileID: 2100000, guid: 088be823e23cb7c4eae90596f3d9cd13, type: 2}
     - target: {fileID: 919132149155446097, guid: 23ead67d7240eec4ca8a334e1a6f810c, type: 3}
       propertyPath: m_Name
-      value: medkit 1
+      value: medkitAileen
       objectReference: {fileID: 0}
     - target: {fileID: 919132149155446097, guid: 23ead67d7240eec4ca8a334e1a6f810c, type: 3}
       propertyPath: m_Layer
-      value: 6
+      value: 7
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []

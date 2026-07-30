@@ -3,6 +3,7 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.AI;
+using UnityEngine.Audio;
 
 public class EnemyController : MonoBehaviour
 {
@@ -15,6 +16,17 @@ public class EnemyController : MonoBehaviour
 
     public float keepChasingTime = 5f;
     private float chaseCounter;
+
+    [Header("Audio")]
+    AudioSource AS;
+
+    public AudioClip spottedSound;
+    public AudioClip robotshootSound;
+    public AudioClip[] footstepSounds;
+    public AudioClip robotgothitSound;
+
+    private float footstepTimer;
+    public float footstepDelay = 0.45f;
 
     [Header("Line of Sight")]
     public LayerMask obstacleMask; // Слой стен/препятствий (НЕ включать игрока и врага!)
@@ -53,6 +65,9 @@ public class EnemyController : MonoBehaviour
 
     void Start()
     {
+        anim = GetComponentInChildren<Animator>();
+        AS = GetComponent<AudioSource>();
+
         originalPoint = transform.position;
 
         ShootTimeCounter = timeToShoot;
@@ -65,6 +80,8 @@ public class EnemyController : MonoBehaviour
 
     public void StunByHit(float duration)
     {
+
+
         StopAllCoroutines();
         stunTimer = duration;
 
@@ -147,6 +164,7 @@ public class EnemyController : MonoBehaviour
                 agent.destination = transform.position;
             }
             anim.SetBool("IsMoving", false);
+
 
             if (chasing)
             {
@@ -297,6 +315,29 @@ public class EnemyController : MonoBehaviour
                 anim.SetBool("IsMoving", true);
             }
         }
+
+        bool isMoving = agent != null &&
+                agent.enabled &&
+                agent.isOnNavMesh &&
+                !agent.isStopped &&
+                agent.velocity.sqrMagnitude > 0.01f;
+
+        if (isMoving && footstepSounds.Length > 0)
+        {
+            footstepTimer -= Time.deltaTime;
+
+            if (footstepTimer <= 0f)
+            {
+                int index = UnityEngine.Random.Range(0, footstepSounds.Length);
+                AS.PlayOneShot(footstepSounds[index], 0.8f);
+
+                footstepTimer = footstepDelay;
+            }
+        }
+        else
+        {
+            footstepTimer = 0f;
+        }
     }
 
     private IEnumerator ShootBurst(float initialDelay)
@@ -310,6 +351,8 @@ public class EnemyController : MonoBehaviour
             Vector3 playerCenter = PlayerController.instance.transform.position + new Vector3(0f, 0.4f, 0f);
             Vector3 directionToPlayer = (playerCenter - firePoint.position).normalized;
             Quaternion accurateRotation = Quaternion.LookRotation(directionToPlayer);
+
+            AS.PlayOneShot(robotshootSound, 1.5f);
 
             GetBullet(firePoint.position, accurateRotation);
 
@@ -377,6 +420,12 @@ public class EnemyController : MonoBehaviour
         if (!hasSpottedPlayer)
         {
             hasSpottedPlayer = true;
+
+            if (spottedSound != null)
+            {
+                AS.PlayOneShot(spottedSound, 2f);
+            }
+
             if (CombatManager.instance != null)
             {
                 CombatManager.instance.RegisterEnemy();

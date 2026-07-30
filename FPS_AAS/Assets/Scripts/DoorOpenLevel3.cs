@@ -18,9 +18,14 @@ public class Door : MonoBehaviour, IInteractable
     public void Interact()
     {
         if (isOpen)
+        {
             CloseDoor();
+        }
         else
+        {
+            PlayerController.instance.PlaySFX(PlayerController.instance.doorSound);
             OpenDoor();
+        }
     }
 
     private void OpenDoor()

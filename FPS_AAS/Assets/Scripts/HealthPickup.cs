@@ -2,7 +2,6 @@ using UnityEngine;
 
 public class HealthPickup : MonoBehaviour, IInteractable
 {
-
     public string GetPromptText()
     {
         return "Press E to pick up Medkit";
@@ -12,19 +11,13 @@ public class HealthPickup : MonoBehaviour, IInteractable
     {
         if (PlayerHealthController.instance != null)
         {
-            // check if have space
-            if (PlayerHealthController.instance.medkitsCount >= PlayerHealthController.instance.maxMedkits)
+            // AddMedkit сам проверит лимит, обновит UI и вернет true, если подбор удался
+            bool success = PlayerHealthController.instance.AddMedkit(1);
+
+            if (success)
             {
-                UIController.instance.ShowMessage("Medkits capacity is full!");
-                return;
+                Destroy(gameObject);
             }
-
-            // add medkit
-            PlayerHealthController.instance.medkitsCount++;
-
-            UIController.instance.ShowMessage("Picked up a Medkit!");
-
-            Destroy(gameObject);
         }
     }
 }

@@ -17,8 +17,10 @@ public class Gun : MonoBehaviour
 
     [Header("Melee Settings")]
     public bool isMelee;
+    public int meleeDamage;
     public float meleeRange = 2f;
-    public int meleeDamage = 25;
+    public float meleeDamageDelay = 0.3f; 
+
 
     [Header("Ammo")]
     public string ammoType;
@@ -29,8 +31,15 @@ public class Gun : MonoBehaviour
     public float reloadTime = 2.0f;
     public bool isReloading = false;
 
+    [Header("UI")]
+    public Sprite gunIcon;
+
     [Header("Animation")]
     public Animator weaponAnim;
+   
+    public ParticleSystem muzzleEffect;
+
+    public ParticleSystem hitEffectPrefab;
 
     private Queue<BulletController> bulletPool = new Queue<BulletController>();
     private Transform poolParent;
@@ -126,11 +135,11 @@ public class Gun : MonoBehaviour
 
         if (isMelee)
         {
-            UIController.instance.ammoText.text = ammoType + " : ∞";
+            UIController.instance.ammoText.text = "∞";
         }
         else
         {
-            UIController.instance.ammoText.text = ammoType + " : " + currentAmmo + " / " + reserveAmmo;
+            UIController.instance.ammoText.text = "" + currentAmmo + " / " + reserveAmmo;
         }
     }
 
@@ -145,6 +154,16 @@ public class Gun : MonoBehaviour
         }
         UpdateAmmoUI();
     }
+
+    public void PlayMuzzle()
+    {
+        if (muzzleEffect != null)
+        {
+            muzzleEffect.Clear(); // очищаем старые частицы
+            muzzleEffect.Play();
+        }
+    }
+
 
     public void PreparePool()
     {

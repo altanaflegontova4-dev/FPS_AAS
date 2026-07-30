@@ -7,6 +7,11 @@ public class UIController : MonoBehaviour
 {
     public static UIController instance;
 
+
+    [Header("Objective")]
+    public GameObject objectivePanel;
+    public Text objectiveText;
+
     [Header("Health")]
     public Slider healthSlider;
     public Text healthText;
@@ -18,6 +23,10 @@ public class UIController : MonoBehaviour
 
     [Header("Ammo")]
     public Text ammoText;
+    public UnityEngine.UI.Image weaponIconImage;
+
+    [Header("Medkit UI")]
+    public Text medkitCountText;
 
     [Header("Interact")]
     public Text interactPromptText; 
@@ -44,6 +53,16 @@ public class UIController : MonoBehaviour
 
     [Header("Crosshair")]
     public GameObject crosshair;
+    public float idleScale = 1f;    
+    public float walkScale = 1.35f; 
+    public float scaleSpeed = 10f;  
+    private float targetScale;
+
+
+    [Header("Hit Effect")]
+    public UnityEngine.Rendering.Volume hitVolume; 
+    private UnityEngine.Rendering.Universal.Vignette hitVignette;
+    private Coroutine hitEffectCoroutine;
 
     public void Awake()
     {
@@ -54,10 +73,19 @@ public class UIController : MonoBehaviour
     {
         HideInteractPrompt();
         HideMessage();
+
+        if (hitVolume != null)
+            hitVolume.profile.TryGet(out hitVignette);
     }
 
     void Update()
     {
+        if (crosshair != null)
+        {
+            float current = Mathf.Lerp(crosshair.transform.localScale.x, targetScale, Time.deltaTime * scaleSpeed);
+            crosshair.transform.localScale = new Vector3(current, current, 1f);
+        }
+
         if (notePanel != null && notePanel.activeSelf)
         {
             if (Input.GetKeyDown(KeyCode.E))
@@ -67,6 +95,79 @@ public class UIController : MonoBehaviour
             }
         }
     }
+
+
+    /// <summary>
+    /// Обновить текущую цель на экране. Если передать пустую строку "", панель скроется.
+    /// </summary>
+    public void UpdateObjective(string newObjective)
+    {
+        if (string.IsNullOrEmpty(newObjective))
+        {
+            HideObjective();
+            return;
+        }
+
+        if (objectivePanel != null)
+            objectivePanel.SetActive(true);
+
+        if (objectiveText != null)
+            objectiveText.text = newObjective;
+    }
+
+
+
+    public void UpdateWeaponIcon(Sprite icon)
+    {
+        if (weaponIconImage != null)
+        {
+            if (icon != null)
+            {
+                weaponIconImage.gameObject.SetActive(true);
+                weaponIconImage.sprite = icon;
+            }
+            else
+            {
+                // Если иконка не задана (например, для ножа), скрываем её
+                weaponIconImage.gameObject.SetActive(false);
+            }
+        }
+    }
+
+    // Метод обновления количества аптечек
+    public void UpdateMedkitCount(int count)
+    {
+        if (medkitCountText != null)
+        {
+            medkitCountText.text = count.ToString();
+        }
+    }
+
+
+
+    public void HideObjective()
+    {
+        if (objectivePanel != null)
+            objectivePanel.SetActive(false);
+    }
+
+    public void SetCrosshairWalking(bool isWalking, bool isMelee)
+    {
+        if (crosshair != null)
+        {
+            // Прицел должен быть активен ТОЛЬКО если это не нож и не открыта записка
+            bool isNoteOpen = notePanel != null && notePanel.activeSelf;
+            bool shouldBeActive = !isMelee && !isNoteOpen;
+
+            if (crosshair.activeSelf != shouldBeActive)
+            {
+                crosshair.SetActive(shouldBeActive);
+            }
+        }
+
+        targetScale = isWalking ? walkScale : idleScale;
+    }
+
 
     public void ShowInteractPrompt(string text)
     {
@@ -122,7 +223,7 @@ public class UIController : MonoBehaviour
             healthSlider.value = currentHealth / maxHealth;
 
         if (healthText != null)
-            healthText.text = "HP: " + currentHealth;
+            healthText.text = ""+ currentHealth;
     }
 
     public void ShowDialogue(string text)
@@ -191,8 +292,15 @@ public class UIController : MonoBehaviour
         if (notePanel != null)
             notePanel.SetActive(false);
 
+        // При закрытии записки включаем прицел ТОЛЬКО если в руках НЕ нож
         if (crosshair != null)
-            crosshair.SetActive(true);
+        {
+            bool isMelee = PlayerController.instance != null &&
+                           PlayerController.instance.activeGun != null &&
+                           PlayerController.instance.activeGun.isMelee;
+
+            crosshair.SetActive(!isMelee);
+        }
 
         // скрываем курсор обратно
         Cursor.lockState = CursorLockMode.Locked;
@@ -200,5 +308,37 @@ public class UIController : MonoBehaviour
 
         // разблокируем игрока
         PlayerController.instance.enabled = true;
+    }
+
+    public void ShowHitEffect()
+    {
+        if (hitEffectCoroutine != null)
+            StopCoroutine(hitEffectCoroutine);
+        hitEffectCoroutine = StartCoroutine(HitEffectCoroutine());
+    }
+
+    private IEnumerator HitEffectCoroutine()
+    {
+        if (hitVignette == null) yield break;
+
+        // включаем красную виньетку
+        hitVignette.color.Override(Color.red);
+        hitVignette.intensity.Override(0.6f);
+
+        yield return new WaitForSeconds(0.1f);
+
+        // плавно убираем
+        float elapsed = 0f;
+        float duration = 0.3f;
+
+        while (elapsed < duration)
+        {
+            elapsed += Time.deltaTime;
+            float t = elapsed / duration;
+            hitVignette.intensity.Override(Mathf.Lerp(0.6f, 0f, t));
+            yield return null;
+        }
+
+        hitVignette.intensity.Override(0f);
     }
 }

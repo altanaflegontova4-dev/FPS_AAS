@@ -43,6 +43,10 @@ public class MleeRobot1Controller : MonoBehaviour
     private float attackTimer;
     private bool isAttacking;
 
+    [Header("Attack Timing")]
+    public float punchDamageDelay = 0.6f;
+    public float kickDamageDelay = 0.8f;
+
     public float attackDuration = 1.2f;
     private float attackDurationTimer;
 
@@ -209,23 +213,21 @@ public class MleeRobot1Controller : MonoBehaviour
             isAttacking = true;
 
             if (agent != null)
-            {
                 agent.enabled = false;
-            }
 
             int attackChoice = Random.Range(0, 2);
             if (attackChoice == 0)
             {
                 anim.SetTrigger("Punch");
+                StartCoroutine(DealDamageDelayed(punchDamageDelay));
             }
             else
             {
                 anim.SetTrigger("Kick");
+                StartCoroutine(DealDamageDelayed(kickDamageDelay));
             }
 
             attackTimer = attackCooldown;
-
-            StartCoroutine(DealDamageDelayed(0.4f));
             StartCoroutine(FinishAttackRoutine(attackDuration));
         }
     }

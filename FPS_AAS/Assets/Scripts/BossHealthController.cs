@@ -8,6 +8,11 @@ public class BossHealthController : MonoBehaviour, IDamagable
     public int currentHealth;
     public Animator anim;
 
+    [Header("Death Effects")]
+    public ParticleSystem smokeEffect;
+    public ParticleSystem electricEffect;
+    public Transform[] effectSpawnPoints;
+
     public BossController bossController;
 
     private bool isDead;
@@ -87,7 +92,9 @@ public class BossHealthController : MonoBehaviour, IDamagable
         isDead = true;
         anim.SetTrigger("Die");
 
-        // скрываем health bar при смерти
+        // запускаем эффекты смерти
+        PlayDeathEffects();
+
         if (UIController.instance.bossHealthPanel != null)
             UIController.instance.bossHealthPanel.SetActive(false);
 
@@ -115,5 +122,42 @@ public class BossHealthController : MonoBehaviour, IDamagable
         }
 
         Destroy(gameObject, destroyDelay);
+    }
+
+    void PlayDeathEffects()
+    {
+        // если есть точки спавна — играем в каждой точке
+        if (effectSpawnPoints != null && effectSpawnPoints.Length > 0)
+        {
+            foreach (Transform point in effectSpawnPoints)
+            {
+                if (smokeEffect != null)
+                {
+                    ParticleSystem smoke = Instantiate(smokeEffect, point.position, point.rotation);
+                    Destroy(smoke.gameObject, destroyDelay);
+                }
+
+                if (electricEffect != null)
+                {
+                    ParticleSystem electric = Instantiate(electricEffect, point.position, point.rotation);
+                    Destroy(electric.gameObject, destroyDelay);
+                }
+            }
+        }
+        else
+        {
+            // если точек нет — играем на позиции босса
+            if (smokeEffect != null)
+            {
+                ParticleSystem smoke = Instantiate(smokeEffect, transform.position, transform.rotation);
+                Destroy(smoke.gameObject, destroyDelay);
+            }
+
+            if (electricEffect != null)
+            {
+                ParticleSystem electric = Instantiate(electricEffect, transform.position, transform.rotation);
+                Destroy(electric.gameObject, destroyDelay);
+            }
+        }
     }
 }

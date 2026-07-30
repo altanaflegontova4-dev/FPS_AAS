@@ -237,6 +237,17 @@ public class PlayerController : MonoBehaviour
             footstepTimer = 0f;
         }
 
+        bool isMoving = charCon.velocity.magnitude > 0.1f;
+
+       
+        bool isMelee = activeGun != null && activeGun.isMelee;
+
+       
+        if (UIController.instance != null)
+        {
+            UIController.instance.SetCrosshairWalking(isMoving, isMelee);
+        }
+
         // Поворот камеры и игрока
         Vector2 mouseInput = new Vector2(Input.GetAxisRaw("Mouse X"), Input.GetAxisRaw("Mouse Y")) * mouseSensitivity;
         transform.rotation = Quaternion.Euler(transform.rotation.eulerAngles.x, transform.rotation.eulerAngles.y + mouseInput.x, transform.rotation.eulerAngles.z);
@@ -311,6 +322,9 @@ public class PlayerController : MonoBehaviour
                 }
             }
         }
+            StartCoroutine(MeleeAttackDelayed());
+        }
+
         // --- ЛОГИКА ОГНЕСТРЕЛА ---
         else
         {
@@ -341,12 +355,15 @@ public class PlayerController : MonoBehaviour
             }
 
             activeGun.currentAmmo--;
+           
             activeGun.GetBullet(activeGun.firePoint.position, activeGun.firePoint.rotation);
 
             if (activeGun.fireSound != null)
             {
                 PlaySFX(activeGun.fireSound, 2f);
             }
+
+            activeGun.PlayMuzzle();
         }
 
         activeGun.fireCounter = activeGun.fireRate;
@@ -365,6 +382,7 @@ public class PlayerController : MonoBehaviour
     {
         isSwitchingGun = true;
 
+        // 1. Прячем старое оружие
         if (activeGun != null)
         {
             activeGun.PlayHide();
@@ -372,23 +390,34 @@ public class PlayerController : MonoBehaviour
 
         yield return new WaitForSeconds(switchGunDelay);
 
+        // 2. Выключаем старое оружие
         if (activeGun != null)
         {
             activeGun.gameObject.SetActive(false);
         }
 
+        // 3. Выбираем индекс нового оружия
         currentGun++;
         if (currentGun >= allGuns.Count)
         {
             currentGun = 0;
         }
 
+        // 4. Присваиваем новое оружие в activeGun
         activeGun = allGuns[currentGun];
+
+        // 5. Включаем новое оружие И ОБНОВЛЯЕМ ИКОНКУ НОВОГО ОРУЖИЯ
         if (activeGun != null)
         {
             activeGun.gameObject.SetActive(true);
             activeGun.PlayUnhide();
             activeGun.UpdateAmmoUI();
+
+            // <-- ВОТ ЗДЕСЬ обновляем иконку для уже НОВОГО activeGun:
+            if (UIController.instance != null)
+            {
+                UIController.instance.UpdateWeaponIcon(activeGun.gunIcon);
+            }
         }
 
         isSwitchingGun = false;
@@ -440,11 +469,62 @@ public class PlayerController : MonoBehaviour
         // Включаем и проигрываем анимацию доставания
         activeGun.gameObject.SetActive(true);
         activeGun.PlayUnhide();
+        UIController.instance.UpdateWeaponIcon(gunPrefab.gunIcon);
         activeGun.UpdateAmmoUI();
 
         if (UIController.instance != null)
         {
             UIController.instance.ShowMessage("Picked up " + newGun.ammoType + "!");
+        }
+    }
+
+
+    private IEnumerator MeleeAttackDelayed()
+    {
+        yield return new WaitForSeconds(activeGun.meleeDamageDelay);
+
+        Debug.Log("Melee raycast firing");
+
+        RaycastHit hit;
+        Vector3 rayOrigin = camTrans.position + (camTrans.forward * 0.2f);
+
+        if (Physics.Raycast(rayOrigin, camTrans.forward, out hit,
+            activeGun.meleeRange,
+            Physics.DefaultRaycastLayers,
+            QueryTriggerInteraction.Ignore))
+        {
+            Debug.Log("Hit: " + hit.collider.gameObject.name);
+
+            if (activeGun.hitEffectPrefab != null)
+            {
+                Debug.Log("Spawning effect at: " + hit.point);
+                Vector3 newPosition = hit.point - camTrans.forward * 0.05f;
+                ParticleSystem effect = Instantiate(
+                    activeGun.hitEffectPrefab,
+                    newPosition,
+                    Quaternion.LookRotation(-camTrans.forward)
+                );
+                Destroy(effect.gameObject, 2f);
+            }
+            else
+            {
+                Debug.LogError("hitEffectPrefab is NULL!");
+            }
+
+            IDamagable damageable = hit.collider.GetComponentInParent<IDamagable>();
+            if (damageable != null)
+            {
+                damageable.TakeDamage(activeGun.meleeDamage, false);
+                Debug.Log("Damage dealt!");
+            }
+            else
+            {
+                Debug.Log("No IDamagable on: " + hit.collider.gameObject.name);
+            }
+        }
+        else
+        {
+            Debug.Log("Raycast missed! Range: " + activeGun.meleeRange);
         }
     }
 }

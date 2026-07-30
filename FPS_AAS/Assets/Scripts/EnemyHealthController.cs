@@ -12,6 +12,11 @@ public class EnemyHealthController : MonoBehaviour, IDamagable
 
     private bool isDead;
 
+    [Header("Death Effects")]
+    public ParticleSystem smokeEffect;
+    public ParticleSystem electricEffect;
+    public Transform[] effectSpawnPoints;
+
     // Длительность анимации получения урона в секундах (подкрути под свою анимацию Hit)
     public float hitStunDuration = 0.6f;
 
@@ -57,6 +62,7 @@ public class EnemyHealthController : MonoBehaviour, IDamagable
             anim.SetTrigger("Hit");
         }
 
+
         NavMeshAgent agent = GetComponent<NavMeshAgent>();
         if (agent != null)
         {
@@ -74,6 +80,8 @@ public class EnemyHealthController : MonoBehaviour, IDamagable
         isDead = true;
 
         anim.SetTrigger("Die");
+
+        PlayDeathEffects();
 
         // Отключаем скрипт управления
         if (enemyController != null)
@@ -105,5 +113,40 @@ public class EnemyHealthController : MonoBehaviour, IDamagable
 
         // НЕ уничтожаем сразу
         Destroy(gameObject, 5f);
+    }
+
+    void PlayDeathEffects()
+    {
+        if (effectSpawnPoints != null && effectSpawnPoints.Length > 0)
+        {
+            foreach (Transform point in effectSpawnPoints)
+            {
+                if (smokeEffect != null)
+                {
+                    ParticleSystem smoke = Instantiate(smokeEffect, point.position, point.rotation);
+                    Destroy(smoke.gameObject, 2.5f);
+                }
+
+                if (electricEffect != null)
+                {
+                    ParticleSystem electric = Instantiate(electricEffect, point.position, point.rotation);
+                    Destroy(electric.gameObject, 2.5f);
+                }
+            }
+        }
+        else
+        {
+            if (smokeEffect != null)
+            {
+                ParticleSystem smoke = Instantiate(smokeEffect, transform.position + Vector3.up, transform.rotation);
+                Destroy(smoke.gameObject, 2.5f);
+            }
+
+            if (electricEffect != null)
+            {
+                ParticleSystem electric = Instantiate(electricEffect, transform.position + Vector3.up, transform.rotation);
+                Destroy(electric.gameObject, 2.5f);
+            }
+        }
     }
 }

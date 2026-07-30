@@ -12,27 +12,55 @@ public class ObjectiveManager : MonoBehaviour
 
     private int nodesDestroyed = 0;
     private int totalNodes = 3;
+    [Header("Progress")]
+    public int nodesDestroyed = 0;
+    public int totalNodes = 3;
+
+    [Header("Objective Texts")]
+    public string initialObjectiveText = "Destroy network nodes";
+    public string completedObjectiveText = "Proceed to the Boss Chamber";
 
     void Awake()
     {
         instance = this;
     }
 
+    void Start()
+    {
+        //Show current objective
+        UpdateObjectiveUI();
+    }
+
     public void NodeDestroyed()
     {
         nodesDestroyed++;
 
-        UIController.instance.ShowMessage(
-            "Node destroyed: " + nodesDestroyed + "/" + totalNodes);
-
-        if (nodesDestroyed >= totalNodes)
+        // Check progression
+        if (nodesDestroyed >= totalNodes)//if all nodes done
         {
-            // все nodes уничтожены
-            UIController.instance.ShowMessage(
-                "All nodes destroyed! The Overseer is weakened.");
+            // Сообщение по центру/сбоку
+            if (UIController.instance != null)
+            {
+                UIController.instance.ShowMessage("All nodes destroyed! The Overseer is weakened.");
 
-            // открыть дверь к боссу
-            // BossDoor.instance.Open();
+                // Change objective
+                UIController.instance.UpdateObjective(completedObjectiveText);
+            }
+
+     
+        }
+        else //if not all nodes doen
+        {
+            UpdateObjectiveUI();
+        }
+    }
+
+    private void UpdateObjectiveUI()
+    {
+        if (UIController.instance != null)
+        {
+            string fullObjective = initialObjectiveText + " (" + nodesDestroyed + "/" + totalNodes + ")";
+            UIController.instance.UpdateObjective(fullObjective);
         }
     }
 

@@ -23,7 +23,7 @@ public class AmmoPickup : MonoBehaviour, IInteractable
                 }
 
                 gun.AddAmmo(ammoAmount);
-                PlayerController.instance.PlaySFX(PlayerController.instance.useammoSound, 3f);
+                PlayerController.instance.PlaySFX(PlayerController.instance.pickupSound, 3f);
 
                 UIController.instance.ShowMessage("You picked up " + ammoAmount + " " + ammoType + " ammo!");
                 Destroy(gameObject);

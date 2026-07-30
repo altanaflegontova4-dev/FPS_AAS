@@ -12,6 +12,17 @@ public class PlayerController : MonoBehaviour
     private int jumpAgain;
     public Animator anim;
 
+    private Vector3 pushVelocity = Vector3.zero;
+    public float pushDecay = 5f;
+
+    public float mouseSensitivity;
+
+    public GameObject bullet;
+
+    public Gun activeGun;
+    public List<Gun> allGuns = new List<Gun>();
+    public int currentGun;
+
     AudioSource AS;
     AudioSource ASbg;
     AudioSource ASambient;
@@ -19,7 +30,6 @@ public class PlayerController : MonoBehaviour
     public AudioClip[] walkStep;
     public AudioClip[] sprintStep;
     public AudioClip jumpclothSound;
-    public AudioClip shootSound;
     public AudioClip deathSound;
     public AudioClip switchgunSound;
     public AudioClip doorSound;
@@ -32,31 +42,18 @@ public class PlayerController : MonoBehaviour
     public AudioClip switchSound;
     public AudioClip healthfullSound;
 
-
-
-
     public AudioClip bgSound;
     public AudioClip ambientSound;
+
+    public AudioClip noteSound;
+    public AudioClip noteCloseSound;
 
     private int lastFootstep = -1;
     private float footstepTimer;
     public float walkStepDelay = 0.5f;
     public float sprintStepDelay = 0.25f;
-
-    private Vector3 pushVelocity = Vector3.zero;
-    public float pushDecay = 5f;
-
-    public float mouseSensitivity;
-
-    public GameObject bullet;
-
-    public Gun activeGun;
-    public List<Gun> allGuns = new List<Gun>();
-    public int currentGun;
-
     private float noAmmoCooldown = 0f;
     public float noAmmoDelay = 0.3f;
-
 
     [Header("Weapon Switch Delay")]
     [Tooltip("Время анимации убирания оружия перед доставанием нового")]
@@ -93,11 +90,9 @@ public class PlayerController : MonoBehaviour
         AS.PlayOneShot(walkStep[index]);
     }
 
-
-
     int randomIndex;
 
-void Start()
+    void Start()
     {
         AudioSource[] sources = GetComponents<AudioSource>();
 
@@ -144,7 +139,6 @@ void Start()
         {
             noAmmoCooldown -= Time.deltaTime;
         }
-            
 
         // Логика отталкивания
         if (pushVelocity.magnitude > 0.1f)
@@ -233,7 +227,7 @@ void Start()
 
                 lastFootstep = randomIndex;
 
-                AS.PlayOneShot(currentSteps[randomIndex], 2f);
+                AS.PlayOneShot(currentSteps[randomIndex], 1.8f);
 
                 footstepTimer = stepDelay;
             }
@@ -243,8 +237,6 @@ void Start()
             footstepTimer = 0f;
         }
 
-        //Player looking rotation
-        Vector2 mouseInput = new Vector2(Input.GetAxisRaw ("Mouse X"), Input.GetAxisRaw("Mouse Y")) * mouseSensitivity; //mouse is moving in 2d - left/right and up/down
         // Поворот камеры и игрока
         Vector2 mouseInput = new Vector2(Input.GetAxisRaw("Mouse X"), Input.GetAxisRaw("Mouse Y")) * mouseSensitivity;
         transform.rotation = Quaternion.Euler(transform.rotation.eulerAngles.x, transform.rotation.eulerAngles.y + mouseInput.x, transform.rotation.eulerAngles.z);
@@ -259,6 +251,12 @@ void Start()
             AS.PlayOneShot(reloadSound, 2.5f);
 
             activeGun.Reload();
+        }
+
+        if (!activeGun.isMelee && Input.GetMouseButtonDown(0) &&activeGun.currentAmmo <= 0 && noAmmoCooldown <= 0f)
+        {
+            PlaySFX(outofammoSound, 3f);
+            noAmmoCooldown = noAmmoDelay;
         }
 
         // Атака / Стрельба
@@ -295,6 +293,11 @@ void Start()
 
         if (activeGun.isMelee)
         {
+            if (activeGun.fireSound != null)
+            {
+                PlaySFX(activeGun.fireSound, 2f);
+            }
+
             RaycastHit hit;
             if (Physics.Raycast(camTrans.position, camTrans.forward, out hit, activeGun.meleeRange))
             {
@@ -310,18 +313,16 @@ void Start()
         }
         // --- ЛОГИКА ОГНЕСТРЕЛА ---
         else
-
-        if (activeGun.currentAmmo <= 0)
         {
-            if (noAmmoCooldown <= 0f)
+            if (activeGun.currentAmmo <= 0)
             {
-                PlaySFX(outofammoSound, 3f);
-                noAmmoCooldown = noAmmoDelay;
-            }
+                if (noAmmoCooldown <= 0f)
+                {
+                    noAmmoCooldown = noAmmoDelay;
+                }
 
-            return;
-        }
-            if (activeGun.currentAmmo <= 0) return;
+                return;
+            }
 
             if (activeGun.firePoint == null)
             {
@@ -341,6 +342,11 @@ void Start()
 
             activeGun.currentAmmo--;
             activeGun.GetBullet(activeGun.firePoint.position, activeGun.firePoint.rotation);
+
+            if (activeGun.fireSound != null)
+            {
+                PlaySFX(activeGun.fireSound, 2f);
+            }
         }
 
         activeGun.fireCounter = activeGun.fireRate;
@@ -349,6 +355,8 @@ void Start()
 
     public void switchGun()
     {
+        AS.PlayOneShot(switchgunSound);
+
         if (allGuns.Count <= 1) return;
         StartCoroutine(SwitchGunCoroutine());
     }

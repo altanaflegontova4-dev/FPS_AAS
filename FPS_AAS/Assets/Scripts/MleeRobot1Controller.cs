@@ -230,6 +230,13 @@ public class MleeRobot1Controller : MonoBehaviour
         }
     }
 
+    public void PlayHitSound()
+    {
+        if (AS != null && robotgothitSound != null)
+        {
+            AS.PlayOneShot(robotgothitSound, 1.2f);
+        }
+    }
     private System.Collections.IEnumerator DealDamageDelayed(float delay)
     {
         yield return new WaitForSeconds(delay);

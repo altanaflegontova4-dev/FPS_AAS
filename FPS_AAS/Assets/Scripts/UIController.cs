@@ -62,6 +62,7 @@ public class UIController : MonoBehaviour
         {
             if (Input.GetKeyDown(KeyCode.E))
             {
+                PlayerController.instance.PlaySFX(PlayerController.instance.noteCloseSound, 2f);
                 HideNote();
             }
         }
@@ -158,6 +159,12 @@ public class UIController : MonoBehaviour
 
     public void ShowNote(string title, string body, Sprite image = null)
     {
+        Debug.Log("ShowNote called");
+
+        notePanel.SetActive(true);
+
+        Debug.Log("NotePanel active: " + notePanel.activeSelf);
+
         if (notePanel != null)
             notePanel.SetActive(true);
 

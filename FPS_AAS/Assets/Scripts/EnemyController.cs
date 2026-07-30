@@ -78,6 +78,13 @@ public class EnemyController : MonoBehaviour
         PrepareBulletPool();
     }
 
+    public void PlayHitSound()
+    {
+        if (AS != null && robotgothitSound != null)
+        {
+            AS.PlayOneShot(robotgothitSound, 1.2f);
+        }
+    }
     public void StunByHit(float duration)
     {
 

@@ -94,6 +94,9 @@ public class NPCDialogue : MonoBehaviour, IInteractable
         if (anim != null)
             anim.SetBool(talkBool, false);
 
+        ObjectiveManager.instance.RescueSurvivor();
+        promptText = "Survivor rescued";
+
         UIController.instance.HideDialogue();
     }
 }

@@ -35,6 +35,12 @@ public class EnemyHealthController : MonoBehaviour, IDamagable
         }
 
         currentHealth -= damage;
+
+        if (enemyController != null)
+        {
+            enemyController.PlayHitSound();
+        }
+
         Debug.Log("Enemy Health: " + currentHealth);
 
         // 1. ПРОВЕРЯЕМ СМЕРТЬ В ПЕРВУЮ ОЧЕРЕДЬ!

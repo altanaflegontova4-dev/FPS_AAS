@@ -32,6 +32,9 @@ public class Gun : MonoBehaviour
     [Header("Animation")]
     public Animator weaponAnim;
 
+    [Header("Audio")]
+    public AudioClip fireSound;
+
     private Queue<BulletController> bulletPool = new Queue<BulletController>();
     private Transform poolParent;
     private bool poolReady;

@@ -15,6 +15,9 @@ public class WeaponPickup : MonoBehaviour, IInteractable
     {
         if (PlayerController.instance != null && gunPrefab != null)
         {
+            PlayerController.instance.PlaySFX(PlayerController.instance.pickupSound, 2f);
+
+
             // Передаем префаб оружия игроку
             PlayerController.instance.AddWeapon(gunPrefab);
 

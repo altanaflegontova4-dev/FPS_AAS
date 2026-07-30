@@ -10,8 +10,6 @@ public class ObjectiveManager : MonoBehaviour
 
     public bool survivorRescued = false;
 
-    private int nodesDestroyed = 0;
-    private int totalNodes = 3;
     [Header("Progress")]
     public int nodesDestroyed = 0;
     public int totalNodes = 3;

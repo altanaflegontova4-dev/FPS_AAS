@@ -309,19 +309,6 @@ public class PlayerController : MonoBehaviour
                 PlaySFX(activeGun.fireSound, 2f);
             }
 
-            RaycastHit hit;
-            if (Physics.Raycast(camTrans.position, camTrans.forward, out hit, activeGun.meleeRange))
-            {
-                // Ищем интерфейс IDamagable на объекте или его родителях (как у тебя в BulletController)
-                IDamagable damageable = hit.collider.GetComponentInParent<IDamagable>();
-
-                if (damageable != null)
-                {
-                    // Передаем урон ножа и false (так как атакует ИГРОК, а не по игроку)
-                    damageable.TakeDamage(activeGun.meleeDamage, false);
-                }
-            }
-        }
             StartCoroutine(MeleeAttackDelayed());
         }
 

@@ -53,7 +53,11 @@ public class PlayerHealthController : MonoBehaviour, IDamagable
         if (medkitsCount <= 0)
         {
             if (UIController.instance != null)
+            {
+                PlayerController.instance.PlaySFX(PlayerController.instance.healthfullSound);
                 UIController.instance.ShowMessage("No medkits!");
+            }
+                
             return;
         }
 
@@ -61,7 +65,10 @@ public class PlayerHealthController : MonoBehaviour, IDamagable
         if (currentHealth >= maxHealth)
         {
             if (UIController.instance != null)
+            {
+                PlayerController.instance.PlaySFX(PlayerController.instance.healthfullSound);
                 UIController.instance.ShowMessage("Health is already full!");
+            }
             return;
         }
 
@@ -88,7 +95,10 @@ public class PlayerHealthController : MonoBehaviour, IDamagable
         if (medkitsCount >= maxMedkits)
         {
             if (UIController.instance != null)
+            {
+                PlayerController.instance.PlaySFX(PlayerController.instance.healthfullSound);
                 UIController.instance.ShowMessage("Medkits are full!");
+            }
             return false; // Не смогли подобрать
         }
 
@@ -140,7 +150,6 @@ public class PlayerHealthController : MonoBehaviour, IDamagable
                 if (currentHealth <= 0)
                 {
                     transform.parent.gameObject.SetActive(false);
-                    currentHealth = 0;
                     currentHealth = 0;
 
                     PlayerController.instance.PlaySFX(PlayerController.instance.deathSound);

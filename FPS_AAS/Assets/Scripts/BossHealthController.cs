@@ -1,3 +1,4 @@
+using System.Collections;
 using UnityEngine;
 using UnityEngine.AI;
 
@@ -92,7 +93,6 @@ public class BossHealthController : MonoBehaviour, IDamagable
         isDead = true;
         anim.SetTrigger("Die");
 
-        // запускаем эффекты смерти
         PlayDeathEffects();
 
         if (UIController.instance.bossHealthPanel != null)
@@ -107,10 +107,6 @@ public class BossHealthController : MonoBehaviour, IDamagable
         NavMeshAgent agent = GetComponent<NavMeshAgent>();
         if (agent != null) agent.enabled = false;
 
-        RaycastHit hit;
-        if (Physics.Raycast(transform.position + Vector3.up * 1f, Vector3.down, out hit, 4f))
-            transform.position = hit.point;
-
         Collider col = GetComponent<Collider>();
         if (col != null) col.enabled = false;
 
@@ -121,7 +117,17 @@ public class BossHealthController : MonoBehaviour, IDamagable
             rb.linearVelocity = Vector3.zero;
         }
 
-        Destroy(gameObject, destroyDelay);
+        // запускаем финальную катсцену через задержку
+        StartCoroutine(OutroDelay());
+    }
+
+    IEnumerator OutroDelay()
+    {
+        // ждём пока анимация смерти босса доиграет
+        yield return new WaitForSeconds(destroyDelay - 1f);
+
+        if (CutsceneManager.instance != null)
+            CutsceneManager.instance.PlayOutro();
     }
 
     void PlayDeathEffects()

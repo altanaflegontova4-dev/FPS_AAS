@@ -1,6 +1,7 @@
-using System.Collections;
 using UnityEngine;
+using UnityEngine.Video;
 using UnityEngine.UI;
+using System.Collections;
 using UnityEngine.Playables;
 
 public class TeleportWithCutscene : MonoBehaviour, IInteractable
@@ -13,9 +14,7 @@ public class TeleportWithCutscene : MonoBehaviour, IInteractable
     public Transform teleportTarget;
 
     [Header("Assistant Settings")]
-    [Tooltip("Отключить ли ассистента перед боем с боссом?")]
     public bool disableAssistant = true;
-    [Tooltip("Ссылка на GameObject ассистента/напарника")]
     public GameObject assistantObject;
 
     [Header("UI Loading")]
@@ -23,8 +22,9 @@ public class TeleportWithCutscene : MonoBehaviour, IInteractable
     public float fadeSpeed = 4f;
     public float loadingDuration = 2f;
 
-    [Header("Cutscene")]
-    public PlayableDirector cutsceneDirector;
+    [Header("Cutscene Video")]
+    public VideoPlayer cutsceneVideo;
+    public GameObject cutscenePanel; // RawImage панель
     public float manualCutsceneDuration = 4f;
 
     [Header("Player Controller")]
@@ -40,17 +40,12 @@ public class TeleportWithCutscene : MonoBehaviour, IInteractable
 
     private bool isActivating = false;
 
-    public string GetPromptText()
-    {
-        return promptText;
-    }
+    public string GetPromptText() => promptText;
 
     public void Interact()
     {
         if (!isActivating)
-        {
             StartCoroutine(TeleportSequence());
-        }
     }
 
     private IEnumerator TeleportSequence()
@@ -63,7 +58,7 @@ public class TeleportWithCutscene : MonoBehaviour, IInteractable
 
         ToggleWorldScripts(false);
 
-        // 2. Плавное затемнение (Fade Out)
+        // 2. Fade Out
         if (loadingScreenGroup != null)
         {
             loadingScreenGroup.gameObject.SetActive(true);
@@ -78,24 +73,21 @@ public class TeleportWithCutscene : MonoBehaviour, IInteractable
         // 3. Экран загрузки
         yield return new WaitForSeconds(loadingDuration);
 
-        // --- ОТКЛЮЧЕНИЕ АССИСТЕНТА ---
-        // Отключаем его, пока экран полностью черный, чтобы он исчез бесшовно
+        // 4. Отключаем ассистента
         if (disableAssistant && assistantObject != null)
-        {
             assistantObject.SetActive(false);
-            Debug.Log("🤖 Ассистент успешно отключен перед боссом.");
-        }
 
-        // 4. Телепортация игрока
+        // 5. Телепортация
         TeleportPlayerSafe();
 
-        // 5. Запускаем катсцену
-        if (cutsceneDirector != null)
+        // 6. Запускаем видео катсцену
+        if (cutsceneVideo != null && cutscenePanel != null)
         {
-            cutsceneDirector.Play();
+            cutscenePanel.SetActive(true);
+            cutsceneVideo.Play();
         }
 
-        // 6. Плавное появление (Fade In)
+        // 7. Fade In
         if (loadingScreenGroup != null)
         {
             while (loadingScreenGroup.alpha > 0f)
@@ -106,34 +98,34 @@ public class TeleportWithCutscene : MonoBehaviour, IInteractable
             loadingScreenGroup.gameObject.SetActive(false);
         }
 
-        // 7. Ждем окончания катсцены
-        if (cutsceneDirector != null)
+        // 8. Ждём окончания видео
+        if (cutsceneVideo != null)
         {
-            while (cutsceneDirector.state == PlayState.Playing)
+            while (cutsceneVideo.isPlaying)
             {
                 yield return null;
             }
+            // скрываем панель с видео
+            if (cutscenePanel != null)
+                cutscenePanel.SetActive(false);
         }
-        else if (manualCutsceneDuration > 0f)
+        else
         {
             yield return new WaitForSeconds(manualCutsceneDuration);
         }
 
-        // 8. Включаем игрока обратно
+        // 9. Включаем игрока
         if (playerMovementScript != null)
             playerMovementScript.enabled = true;
 
         ToggleWorldScripts(true);
 
-        // 9. Пауза перед активацией босса — игрок готовится
+        // 10. Пауза перед боссом
         yield return new WaitForSeconds(delayBeforeBoss);
 
-        // 10. Активируем босса
+        // 11. Активируем босса
         if (bossController != null)
-        {
             bossController.bossActivated = true;
-            Debug.Log("Босс активирован! Бой начинается!");
-        }
 
         if (bossHealthController != null)
             bossHealthController.ActivateBossUI();

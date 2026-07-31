@@ -12,6 +12,9 @@ public class PlayerController : MonoBehaviour
     private int jumpAgain;
     public Animator anim;
 
+    private Vector3 pushVelocity = Vector3.zero;
+    public float pushDecay = 5f;
+
     public float mouseSensitivity;
 
     public GameObject bullet;
@@ -279,6 +282,11 @@ public class PlayerController : MonoBehaviour
         {
             switchGun();
         }
+    }
+
+    public void ApplyPush(Vector3 direction, float force)
+    {
+        pushVelocity = direction * force;
     }
 
     public void fireShot()

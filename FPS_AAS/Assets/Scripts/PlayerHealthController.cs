@@ -73,7 +73,7 @@ public class PlayerHealthController : MonoBehaviour, IDamagable
         }
 
         // okee
-        PlayerController.instance.PlaySFX(PlayerController.instance.usemedkitSound, 4f);
+        PlayerController.instance.PlaySFX(PlayerController.instance.usemedkitSound, 4.5f);
         // Применяем лечилку
         healPlayer(healAmountPerMedkit);
         medkitsCount--;

@@ -43,7 +43,6 @@ public class PlayerController : MonoBehaviour
     public AudioClip healthfullSound;
 
     public AudioClip bgSound;
-    public AudioClip ambientSound;
 
     public AudioClip noteSound;
     public AudioClip noteCloseSound;
@@ -104,11 +103,6 @@ public class PlayerController : MonoBehaviour
         ASbg.loop = true;
         ASbg.volume = 0.15f;
         ASbg.Play();
-
-        ASambient.clip = ambientSound;
-        ASambient.loop = true;
-        ASambient.volume = 0.1f;
-        ASambient.Play();
 
         // Подготавливаем пули для всех имеющихся пушек
         for (int i = 0; i < allGuns.Count; i++)

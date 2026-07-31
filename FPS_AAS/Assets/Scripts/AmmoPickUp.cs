@@ -18,12 +18,13 @@ public class AmmoPickup : MonoBehaviour, IInteractable
             {
                 if (gun.reserveAmmo >= gun.maxReserveAmmo)
                 {
+                    PlayerController.instance.PlaySFX(PlayerController.instance.healthfullSound);
                     UIController.instance.ShowMessage("Ammo is full!");
                     return;
                 }
 
                 gun.AddAmmo(ammoAmount);
-                PlayerController.instance.PlaySFX(PlayerController.instance.pickupSound, 3f);
+                PlayerController.instance.PlaySFX(PlayerController.instance.pickupSound, 6f);
 
                 UIController.instance.ShowMessage("You picked up " + ammoAmount + " " + ammoType + " ammo!");
                 Destroy(gameObject);

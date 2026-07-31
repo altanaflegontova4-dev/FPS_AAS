@@ -27,7 +27,7 @@ public class NoteInteractable : MonoBehaviour, IInteractable
         if (!isReading)
         {
             isReading = true;
-            PlayerController.instance.PlaySFX(PlayerController.instance.noteSound, 2f);
+            PlayerController.instance.PlaySFX(PlayerController.instance.noteSound, 4f);
 
             UIController.instance.ShowNote(noteTitle, noteText, noteImage);
             // блокируем игрока пока читает

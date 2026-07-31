@@ -30,18 +30,9 @@ public class AssistantController : MonoBehaviour
     private Vector3 lastPlayerPosition;
     private Vector3 targetDestination;
 
-    [Header("Audio")]
-    private AudioSource AS;
-
-    public AudioClip[] footstepSounds;
-
-    private float footstepTimer;
-    public float footstepDelay = 0.45f;
-
     void Awake()
     {
         agent = GetComponent<NavMeshAgent>();
-        AS = GetComponent<AudioSource>();
     }
 
     void Start()
@@ -91,22 +82,6 @@ public class AssistantController : MonoBehaviour
             bool isMoving = agent.velocity.sqrMagnitude > 0.1f && agent.remainingDistance > agent.stoppingDistance;
             anim.SetBool(isWalkingBool, isMoving);
 
-            if (isMoving && footstepSounds.Length > 0)
-            {
-                footstepTimer -= Time.deltaTime;
-
-                if (footstepTimer <= 0f)
-                {
-                    int index = Random.Range(0, footstepSounds.Length);
-                    AS.PlayOneShot(footstepSounds[index], 0.8f);
-
-                    footstepTimer = footstepDelay;
-                }
-            }
-            else
-            {
-                footstepTimer = 0f;
-            }
         }
 
 

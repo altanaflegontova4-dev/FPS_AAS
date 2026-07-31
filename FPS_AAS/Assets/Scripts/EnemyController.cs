@@ -336,7 +336,7 @@ public class EnemyController : MonoBehaviour
             if (footstepTimer <= 0f)
             {
                 int index = UnityEngine.Random.Range(0, footstepSounds.Length);
-                AS.PlayOneShot(footstepSounds[index], 0.8f);
+                AS.PlayOneShot(footstepSounds[index], 0.4f);
 
                 footstepTimer = footstepDelay;
             }

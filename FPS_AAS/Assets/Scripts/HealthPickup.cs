@@ -16,6 +16,8 @@ public class HealthPickup : MonoBehaviour, IInteractable
 
             if (success)
             {
+                PlayerController.instance.PlaySFX(PlayerController.instance.pickupSound, 6f);
+
                 Destroy(gameObject);
             }
         }

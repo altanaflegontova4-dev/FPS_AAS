@@ -6,7 +6,7 @@ public class BulletController : MonoBehaviour
     public float moveSpeed;
     public float lifeTime;
     public Rigidbody rb;
-    public GameObject impactEffect;
+    public ParticleSystem impactEffect;
 
     public bool attackPlayer;
     public int damage;
@@ -76,9 +76,12 @@ public class BulletController : MonoBehaviour
 
         if (impactEffect != null)
         {
-            float offset = 0.7f;
-            Vector3 newPosition = transform.position - transform.forward * offset;
-            Instantiate(impactEffect, newPosition, transform.rotation);
+            Vector3 newPosition = transform.position - transform.forward * 0.1f;
+            ParticleSystem effect = Instantiate(
+                impactEffect,
+                newPosition,
+                Quaternion.LookRotation(-transform.forward) // разворачиваем эффект от поверхности
+            );
         }
 
         ReturnToPool();

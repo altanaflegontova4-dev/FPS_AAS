@@ -1,3 +1,4 @@
+using System.Collections;
 using UnityEngine;
 using UnityEngine.AI;
 
@@ -7,6 +8,11 @@ public class BossHealthController : MonoBehaviour, IDamagable
     public int maxHealth = 100;
     public int currentHealth;
     public Animator anim;
+
+    [Header("Death Effects")]
+    public ParticleSystem smokeEffect;
+    public ParticleSystem electricEffect;
+    public Transform[] effectSpawnPoints;
 
     public BossController bossController;
 
@@ -87,7 +93,8 @@ public class BossHealthController : MonoBehaviour, IDamagable
         isDead = true;
         anim.SetTrigger("Die");
 
-        // скрываем health bar при смерти
+        PlayDeathEffects();
+
         if (UIController.instance.bossHealthPanel != null)
             UIController.instance.bossHealthPanel.SetActive(false);
 
@@ -100,10 +107,6 @@ public class BossHealthController : MonoBehaviour, IDamagable
         NavMeshAgent agent = GetComponent<NavMeshAgent>();
         if (agent != null) agent.enabled = false;
 
-        RaycastHit hit;
-        if (Physics.Raycast(transform.position + Vector3.up * 1f, Vector3.down, out hit, 4f))
-            transform.position = hit.point;
-
         Collider col = GetComponent<Collider>();
         if (col != null) col.enabled = false;
 
@@ -114,6 +117,53 @@ public class BossHealthController : MonoBehaviour, IDamagable
             rb.linearVelocity = Vector3.zero;
         }
 
-        Destroy(gameObject, destroyDelay);
+        // запускаем финальную катсцену через задержку
+        StartCoroutine(OutroDelay());
+    }
+
+    IEnumerator OutroDelay()
+    {
+        // ждём пока анимация смерти босса доиграет
+        yield return new WaitForSeconds(destroyDelay - 1f);
+
+        if (CutsceneManager.instance != null)
+            CutsceneManager.instance.PlayOutro();
+    }
+
+    void PlayDeathEffects()
+    {
+        // если есть точки спавна — играем в каждой точке
+        if (effectSpawnPoints != null && effectSpawnPoints.Length > 0)
+        {
+            foreach (Transform point in effectSpawnPoints)
+            {
+                if (smokeEffect != null)
+                {
+                    ParticleSystem smoke = Instantiate(smokeEffect, point.position, point.rotation);
+                    Destroy(smoke.gameObject, destroyDelay);
+                }
+
+                if (electricEffect != null)
+                {
+                    ParticleSystem electric = Instantiate(electricEffect, point.position, point.rotation);
+                    Destroy(electric.gameObject, destroyDelay);
+                }
+            }
+        }
+        else
+        {
+            // если точек нет — играем на позиции босса
+            if (smokeEffect != null)
+            {
+                ParticleSystem smoke = Instantiate(smokeEffect, transform.position, transform.rotation);
+                Destroy(smoke.gameObject, destroyDelay);
+            }
+
+            if (electricEffect != null)
+            {
+                ParticleSystem electric = Instantiate(electricEffect, transform.position, transform.rotation);
+                Destroy(electric.gameObject, destroyDelay);
+            }
+        }
     }
 }

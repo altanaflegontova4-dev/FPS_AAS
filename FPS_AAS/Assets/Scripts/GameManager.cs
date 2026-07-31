@@ -26,6 +26,26 @@ public class GameManager : MonoBehaviour
         
     }
 
+    public void MainMenu()
+    {
+        SceneManager.LoadScene("MainMenu");
+    }
+
+    public void Level1_Sayat()
+    {
+        SceneManager.LoadScene("Level2_Aileen");
+    }
+
+    public void Level2_Aileen()
+    {
+        SceneManager.LoadScene("Level2_Aileen");
+    }
+
+    public void Level3_Altana()
+    {
+        SceneManager.LoadScene("Level3_Altana");
+    }
+
     public void PlayerDied()
     {
         StartCoroutine(PlayerDiedCo());
@@ -35,5 +55,10 @@ public class GameManager : MonoBehaviour
     {
         yield return new WaitForSeconds(WaitAfterDying);
         SceneManager.LoadScene(SceneManager.GetActiveScene().name);
+    }
+
+    public void exit()
+    {
+        Application.Quit();
     }
 }

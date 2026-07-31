@@ -12,11 +12,22 @@ public class ShootingEnemyHealthController : MonoBehaviour, IDamagable
     private bool isDead;
     public float hitStunDuration = 0.6f;
 
+    [Header("Death Effects")]
+    public ParticleSystem smokeEffect;
+    public ParticleSystem electricEffect;
+    public Transform[] effectSpawnPoints;
+
     public void TakeDamage(int damage, bool attackPlayer)
     {
         if (attackPlayer || isDead) return;
 
         currentHealth -= damage;
+
+        if (enemyController != null)
+        {
+            enemyController.PlayHitSound();
+        }
+
 
         if (currentHealth <= 0)
         {
@@ -44,6 +55,8 @@ public class ShootingEnemyHealthController : MonoBehaviour, IDamagable
         isDead = true;
         anim.SetTrigger("Die");
 
+        PlayDeathEffects();
+
         if (enemyController != null)
         {
             enemyController.CancelAttacks();
@@ -64,5 +77,41 @@ public class ShootingEnemyHealthController : MonoBehaviour, IDamagable
         }
 
         Destroy(gameObject, 2f);
+    }
+
+
+    void PlayDeathEffects()
+    {
+        if (effectSpawnPoints != null && effectSpawnPoints.Length > 0)
+        {
+            foreach (Transform point in effectSpawnPoints)
+            {
+                if (smokeEffect != null)
+                {
+                    ParticleSystem smoke = Instantiate(smokeEffect, point.position, point.rotation);
+                    Destroy(smoke.gameObject, 2.0f);
+                }
+
+                if (electricEffect != null)
+                {
+                    ParticleSystem electric = Instantiate(electricEffect, point.position, point.rotation);
+                    Destroy(electric.gameObject, 2.0f);
+                }
+            }
+        }
+        else
+        {
+            if (smokeEffect != null)
+            {
+                ParticleSystem smoke = Instantiate(smokeEffect, transform.position + Vector3.up, transform.rotation);
+                Destroy(smoke.gameObject, 2.0f);
+            }
+
+            if (electricEffect != null)
+            {
+                ParticleSystem electric = Instantiate(electricEffect, transform.position + Vector3.up, transform.rotation);
+                Destroy(electric.gameObject, 2.0f);
+            }
+        }
     }
 }

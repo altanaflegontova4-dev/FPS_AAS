@@ -16,6 +16,9 @@ public class NPCDialogue : MonoBehaviour, IInteractable
     public float autoAdvanceTime = 4f; // секунд до автоскипа
     public bool canSkip = true;
 
+    [Header("Objective")]
+    public bool isSurvivor = false;
+
     private bool isTalking = false;
     private int currentLine = 0;
     private Coroutine dialogueCoroutine;
@@ -93,6 +96,12 @@ public class NPCDialogue : MonoBehaviour, IInteractable
         // возврат в idle: выключаем Bool, и Аниматор сам вернет NPC в покой
         if (anim != null)
             anim.SetBool(talkBool, false);
+
+        if (isSurvivor && ObjectiveManager.instance != null)
+        {
+            ObjectiveManager.instance.RescueSurvivor();
+            promptText = "Survivor rescued";
+        }
 
         UIController.instance.HideDialogue();
     }

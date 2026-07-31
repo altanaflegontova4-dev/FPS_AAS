@@ -23,6 +23,37 @@ public class PlayerController : MonoBehaviour
     public List<Gun> allGuns = new List<Gun>();
     public int currentGun;
 
+    AudioSource AS;
+    AudioSource ASbg;
+    AudioSource ASambient;
+
+    public AudioClip[] walkStep;
+    public AudioClip[] sprintStep;
+    public AudioClip jumpclothSound;
+    public AudioClip deathSound;
+    public AudioClip switchgunSound;
+    public AudioClip doorSound;
+    public AudioClip reloadSound;
+    public AudioClip usemedkitSound;
+    public AudioClip useammoSound;
+    public AudioClip outofammoSound;
+    public AudioClip[] gethitSound;
+    public AudioClip pickupSound;
+    public AudioClip switchSound;
+    public AudioClip healthfullSound;
+
+    public AudioClip bgSound;
+
+    public AudioClip noteSound;
+    public AudioClip noteCloseSound;
+
+    private int lastFootstep = -1;
+    private float footstepTimer;
+    public float walkStepDelay = 0.5f;
+    public float sprintStepDelay = 0.25f;
+    private float noAmmoCooldown = 0f;
+    public float noAmmoDelay = 0.3f;
+
     [Header("Weapon Switch Delay")]
     [Tooltip("Время анимации убирания оружия перед доставанием нового")]
     public float switchGunDelay = 0.25f;
@@ -37,8 +68,42 @@ public class PlayerController : MonoBehaviour
         instance = this;
     }
 
+    public void PlaySFX(AudioClip clip, float volume = 3f)
+    {
+        AS.PlayOneShot(clip, volume);
+    }
+
+    public void PlayRandomHitSound()
+    {
+        if (gethitSound.Length == 0) return;
+
+        int index = Random.Range(0, gethitSound.Length);
+        AS.PlayOneShot(gethitSound[index], 4.5f);
+    }
+
+    public void PlayRandomStepSound()
+    {
+        if (walkStep.Length == 0) return;
+
+        int index = Random.Range(0, walkStep.Length);
+        AS.PlayOneShot(walkStep[index]);
+    }
+
+    int randomIndex;
+
     void Start()
     {
+        AudioSource[] sources = GetComponents<AudioSource>();
+
+        AS = sources[0];
+        ASbg = sources[1];
+        ASambient = sources[2];
+
+        ASbg.clip = bgSound;
+        ASbg.loop = true;
+        ASbg.volume = 0.15f;
+        ASbg.Play();
+
         // Подготавливаем пули для всех имеющихся пушек
         for (int i = 0; i < allGuns.Count; i++)
         {
@@ -64,6 +129,11 @@ public class PlayerController : MonoBehaviour
 
     void Update()
     {
+        if (noAmmoCooldown > 0)
+        {
+            noAmmoCooldown -= Time.deltaTime;
+        }
+
         // Логика отталкивания
         if (pushVelocity.magnitude > 0.1f)
         {
@@ -101,6 +171,8 @@ public class PlayerController : MonoBehaviour
             {
                 moveInput.y = jumpPower;
                 jumpAgain = 2;
+
+                AS.PlayOneShot(jumpclothSound, 2f);
             }
         }
 
@@ -116,6 +188,47 @@ public class PlayerController : MonoBehaviour
         if (anim != null)
         {
             anim.SetFloat("moveSpeed", horizontalSpeed);
+        }
+
+        // Footstep sounds
+        if (charCon.isGrounded && horizontalSpeed > 0.1f)
+        {
+            footstepTimer -= Time.deltaTime;
+
+            if (footstepTimer <= 0f)
+            {
+                AudioClip[] currentSteps;
+                float stepDelay;
+
+                if (Input.GetKey(KeyCode.LeftShift))
+                {
+                    currentSteps = sprintStep;
+                    stepDelay = sprintStepDelay;
+                }
+                else
+                {
+                    currentSteps = walkStep;
+                    stepDelay = walkStepDelay;
+                }
+
+                int randomIndex;
+
+                do
+                {
+                    randomIndex = Random.Range(0, currentSteps.Length);
+                }
+                while (randomIndex == lastFootstep && currentSteps.Length > 1);
+
+                lastFootstep = randomIndex;
+
+                AS.PlayOneShot(currentSteps[randomIndex], 1.8f);
+
+                footstepTimer = stepDelay;
+            }
+        }
+        else
+        {
+            footstepTimer = 0f;
         }
 
         bool isMoving = charCon.velocity.magnitude > 0.1f;
@@ -140,7 +253,15 @@ public class PlayerController : MonoBehaviour
         // Перезарядка
         if (Input.GetKeyDown(KeyCode.R))
         {
+            AS.PlayOneShot(reloadSound, 2.5f);
+
             activeGun.Reload();
+        }
+
+        if (!activeGun.isMelee && Input.GetMouseButtonDown(0) &&activeGun.currentAmmo <= 0 && noAmmoCooldown <= 0f)
+        {
+            PlaySFX(outofammoSound, 3f);
+            noAmmoCooldown = noAmmoDelay;
         }
 
         // Атака / Стрельба
@@ -177,13 +298,26 @@ public class PlayerController : MonoBehaviour
 
         if (activeGun.isMelee)
         {
+            if (activeGun.fireSound != null)
+            {
+                PlaySFX(activeGun.fireSound, 2f);
+            }
+
             StartCoroutine(MeleeAttackDelayed());
         }
 
         // --- ЛОГИКА ОГНЕСТРЕЛА ---
         else
         {
-            if (activeGun.currentAmmo <= 0) return;
+            if (activeGun.currentAmmo <= 0)
+            {
+                if (noAmmoCooldown <= 0f)
+                {
+                    noAmmoCooldown = noAmmoDelay;
+                }
+
+                return;
+            }
 
             if (activeGun.firePoint == null)
             {
@@ -205,6 +339,11 @@ public class PlayerController : MonoBehaviour
            
             activeGun.GetBullet(activeGun.firePoint.position, activeGun.firePoint.rotation);
 
+            if (activeGun.fireSound != null)
+            {
+                PlaySFX(activeGun.fireSound, 2f);
+            }
+
             activeGun.PlayMuzzle();
         }
 
@@ -214,6 +353,8 @@ public class PlayerController : MonoBehaviour
 
     public void switchGun()
     {
+        AS.PlayOneShot(switchgunSound);
+
         if (allGuns.Count <= 1) return;
         StartCoroutine(SwitchGunCoroutine());
     }

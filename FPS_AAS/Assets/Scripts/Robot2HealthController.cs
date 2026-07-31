@@ -23,6 +23,12 @@ public class ShootingEnemyHealthController : MonoBehaviour, IDamagable
 
         currentHealth -= damage;
 
+        if (enemyController != null)
+        {
+            enemyController.PlayHitSound();
+        }
+
+
         if (currentHealth <= 0)
         {
             Die();

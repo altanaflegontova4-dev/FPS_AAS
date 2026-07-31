@@ -81,7 +81,10 @@ public class AssistantController : MonoBehaviour
         {
             bool isMoving = agent.velocity.sqrMagnitude > 0.1f && agent.remainingDistance > agent.stoppingDistance;
             anim.SetBool(isWalkingBool, isMoving);
+
         }
+
+
     }
 
     void OnDisable()

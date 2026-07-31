@@ -53,7 +53,11 @@ public class PlayerHealthController : MonoBehaviour, IDamagable
         if (medkitsCount <= 0)
         {
             if (UIController.instance != null)
+            {
+                PlayerController.instance.PlaySFX(PlayerController.instance.healthfullSound);
                 UIController.instance.ShowMessage("No medkits!");
+            }
+                
             return;
         }
 
@@ -61,10 +65,15 @@ public class PlayerHealthController : MonoBehaviour, IDamagable
         if (currentHealth >= maxHealth)
         {
             if (UIController.instance != null)
+            {
+                PlayerController.instance.PlaySFX(PlayerController.instance.healthfullSound);
                 UIController.instance.ShowMessage("Health is already full!");
+            }
             return;
         }
 
+        // okee
+        PlayerController.instance.PlaySFX(PlayerController.instance.usemedkitSound, 4.5f);
         // Применяем лечилку
         healPlayer(healAmountPerMedkit);
         medkitsCount--;
@@ -86,7 +95,10 @@ public class PlayerHealthController : MonoBehaviour, IDamagable
         if (medkitsCount >= maxMedkits)
         {
             if (UIController.instance != null)
+            {
+                PlayerController.instance.PlaySFX(PlayerController.instance.healthfullSound);
                 UIController.instance.ShowMessage("Medkits are full!");
+            }
             return false; // Не смогли подобрать
         }
 
@@ -129,6 +141,7 @@ public class PlayerHealthController : MonoBehaviour, IDamagable
             if (invincibleCounter <= 0)
             {
                 currentHealth -= damage;
+                PlayerController.instance.PlayRandomHitSound();
 
                 // Показываем эффекты получения урона
                 if (UIController.instance != null)
@@ -138,6 +151,8 @@ public class PlayerHealthController : MonoBehaviour, IDamagable
                 {
                     transform.parent.gameObject.SetActive(false);
                     currentHealth = 0;
+
+                    PlayerController.instance.PlaySFX(PlayerController.instance.deathSound);
 
                     if (GameManager.instance != null)
                         GameManager.instance.PlayerDied();

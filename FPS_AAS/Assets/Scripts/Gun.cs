@@ -41,6 +41,9 @@ public class Gun : MonoBehaviour
 
     public ParticleSystem hitEffectPrefab;
 
+    [Header("Audio")]
+    public AudioClip fireSound;
+
     private Queue<BulletController> bulletPool = new Queue<BulletController>();
     private Transform poolParent;
     private bool poolReady;
@@ -70,6 +73,7 @@ public class Gun : MonoBehaviour
         }
         if (reserveAmmo == 0 && UIController.instance != null)
         {
+            PlayerController.instance.PlaySFX(PlayerController.instance.outofammoSound);
             UIController.instance.ammoText.text = "Out of ammo";
         }
     }

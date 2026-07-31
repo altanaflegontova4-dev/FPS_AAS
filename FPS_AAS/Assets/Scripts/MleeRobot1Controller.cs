@@ -1,5 +1,6 @@
 using UnityEngine;
 using UnityEngine.AI;
+using UnityEngine.Audio;
 
 public class MleeRobot1Controller : MonoBehaviour
 {
@@ -21,6 +22,18 @@ public class MleeRobot1Controller : MonoBehaviour
 
     private bool hasSpottedPlayer = false;
 
+    [Header("Audio")]
+    AudioSource AS;
+
+    public AudioClip spottedSound;
+    public AudioClip robotkickSound;
+    public AudioClip robotpunchSound;
+    public AudioClip[] footstepSounds;
+    public AudioClip robotgothitSound;
+
+    private float footstepTimer;
+    public float footstepDelay = 0.45f;
+
     [Header("Line of Sight")]
     public LayerMask obstacleMask; // Слой стен и препятствий, которые блокируют обзор
     public float eyeHeight = 1f;   // Высота глаз робота
@@ -41,6 +54,8 @@ public class MleeRobot1Controller : MonoBehaviour
 
     void Start()
     {
+        AS = GetComponent<AudioSource>();
+
         originalPoint = transform.position;
     }
 
@@ -152,6 +167,23 @@ public class MleeRobot1Controller : MonoBehaviour
 
         bool isMoving = agent != null && agent.enabled && agent.isOnNavMesh && !agent.isStopped && agent.velocity.sqrMagnitude > 0.01f;
         anim.SetBool("IsMoving", isMoving);
+
+        if (isMoving && footstepSounds.Length > 0)
+        {
+            footstepTimer -= Time.deltaTime;
+
+            if (footstepTimer <= 0f)
+            {
+                int index = Random.Range(0, footstepSounds.Length);
+                AS.PlayOneShot(footstepSounds[index], 0.4f);
+
+                footstepTimer = footstepDelay;
+            }
+        }
+        else
+        {
+            footstepTimer = 0f;
+        }
     }
 
     bool HasLineOfSight()
@@ -200,6 +232,13 @@ public class MleeRobot1Controller : MonoBehaviour
         }
     }
 
+    public void PlayHitSound()
+    {
+        if (AS != null && robotgothitSound != null)
+        {
+            AS.PlayOneShot(robotgothitSound, 1.2f);
+        }
+    }
     private System.Collections.IEnumerator DealDamageDelayed(float delay)
     {
         yield return new WaitForSeconds(delay);
@@ -240,6 +279,11 @@ public class MleeRobot1Controller : MonoBehaviour
 
     public void StunByHit(float stunDuration)
     {
+        if (robotgothitSound != null)
+        {
+            AS.PlayOneShot(robotgothitSound, 1f);
+        }
+
         // При получении урона/стана гарантированно вступаем в бой
         chasing = true;
         StartCombat();
@@ -276,6 +320,12 @@ public class MleeRobot1Controller : MonoBehaviour
         if (!hasSpottedPlayer)
         {
             hasSpottedPlayer = true;
+
+            if (spottedSound != null)
+            {
+                AS.PlayOneShot(spottedSound, 2f);
+            }
+
             if (CombatManager.instance != null)
             {
                 CombatManager.instance.RegisterEnemy();
@@ -303,5 +353,15 @@ public class MleeRobot1Controller : MonoBehaviour
     private void OnDestroy()
     {
         EndCombat();
+    }
+
+    public void PlayPunchSound()
+    {
+        AS.PlayOneShot(robotpunchSound, 2f);
+    }
+
+    public void PlayKickSound()
+    {
+        AS.PlayOneShot(robotkickSound, 3f);
     }
 }

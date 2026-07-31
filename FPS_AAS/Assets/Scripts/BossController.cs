@@ -6,6 +6,21 @@ using UnityEngine.AI;
 
 public class BossController : MonoBehaviour
 {
+    [Header("Audio")]
+    public AudioSource bossSFX;
+    public AudioSource bossBG;
+
+    public AudioClip[] bossWalk;
+    public AudioClip[] bossSprint;
+
+    public AudioClip bossJump;
+    public AudioClip bossShoot;
+    public AudioClip bossJumpAir;
+    public AudioClip bossGetHit;
+    public AudioClip bossDie;
+
+    private int lastFootstep = -1;
+
     [Header("References")]
     public NavMeshAgent agent;
     public Animator anim;
@@ -239,7 +254,7 @@ public class BossController : MonoBehaviour
         if (agent != null) agent.speed = rageSpeed;
         attackCooldown = 0.6f;
 
-       
+
         SkinnedMeshRenderer[] renderers = GetComponentsInChildren<SkinnedMeshRenderer>();
 
         Debug.Log("SkinnedMeshRenderers found: " + renderers.Length);
@@ -527,5 +542,68 @@ public class BossController : MonoBehaviour
     {
         bullet.gameObject.SetActive(false);
         homingPool.Enqueue(bullet);
+    }
+
+    public void PlayBossJumpSound()
+    {
+        if (bossSFX != null && bossJump != null)
+            bossSFX.PlayOneShot(bossJump);
+    }
+
+    public void PlayBossShootSound()
+    {
+        if (bossSFX != null && bossShoot != null)
+            bossSFX.PlayOneShot(bossShoot);
+    }
+
+    public void PlayBossJumpAirSound()
+    {
+        if (bossSFX != null && bossJumpAir != null)
+            bossSFX.PlayOneShot(bossJumpAir);
+    }
+
+    public void PlayBossGetHitSound()
+    {
+        if (bossSFX != null && bossGetHit != null)
+            bossSFX.PlayOneShot(bossGetHit);
+    }
+
+    public void PlayBossDieSound()
+    {
+        if (bossSFX != null && bossDie != null)
+            bossSFX.PlayOneShot(bossDie);
+    }
+
+    public void PlayBossFootstep()
+    {
+        if (bossSFX == null || agent == null)
+            return;
+
+        if (agent.velocity.sqrMagnitude < 0.01f)
+            return;
+
+        AudioClip[] steps = agent.speed > normalSpeed ? bossSprint : bossWalk;
+
+        if (steps == null || steps.Length == 0)
+            return;
+
+        int index;
+
+        if (steps.Length == 1)
+        {
+            index = 0;
+        }
+        else
+        {
+            do
+            {
+                index = UnityEngine.Random.Range(0, steps.Length);
+            }
+            while (index == lastFootstep);
+
+            lastFootstep = index;
+        }
+
+        bossSFX.PlayOneShot(steps[index], 3f);
     }
 }
